@@ -12,6 +12,16 @@ const PetalTimeline = (() => {
   function dragDistance(velocity, elapsed) {
     return velocity * (1 - Math.pow(.998, elapsed)) / -Math.log(.998);
   }
+  function rubberBand(scroll, width) {
+    const boundary = Math.max(0, Math.min(totalBeats * beatWidth, scroll));
+    const excess = scroll - boundary;
+    const dimension = Math.max(1, width);
+    return boundary + Math.sign(excess) * dimension * .55 * Math.abs(excess) / (dimension + .55 * Math.abs(excess));
+  }
+  function springOffset(displacement, velocity, elapsed) {
+    const damping = .018;
+    return (displacement + (velocity + damping * displacement) * elapsed) * Math.exp(-damping * elapsed);
+  }
   function stickyOffset(scrollLeft, viewportWidth, start, width, labelWidth) {
     const desired = scrollLeft + 59 - viewportWidth / 2 - start;
     return Math.min(Math.max(desired, 0), Math.max(0, width - 62 - labelWidth));
@@ -75,7 +85,7 @@ const PetalTimeline = (() => {
     const scrubber = mini.parentElement;
     const reduced = matchMedia("(prefers-reduced-motion: reduce)");
     let beat = 0, playing = false, frameID = 0, lastBeat = -1, playbackStartBeat = 0;
-    let coastID = 0;
+    let coastID = 0, visualScroll = null;
     let pointer = null, labels = [], labelWidths = [], destroyed = false;
     let previousWidth = 0, scrubberWidth = 0, animations = [], worldAnimation = null;
 
@@ -90,10 +100,11 @@ const PetalTimeline = (() => {
     function update() {
       // Used only while paused/seeking. Playback is entirely compositor-driven.
       const p = position(beat);
-      world.style.transform = "translate3d(" + (-p.scrollLeft) + "px,0,0)";
+      const scroll = visualScroll ?? p.scrollLeft;
+      world.style.transform = "translate3d(" + (-scroll) + "px,0,0)";
       labels.forEach((label, index) => {
         const s = sections[index];
-        const offset = stickyOffset(p.scrollLeft, previousWidth, s.start * beatWidth, s.beats * beatWidth - 2, labelWidths[index]);
+        const offset = stickyOffset(scroll, previousWidth, s.start * beatWidth, s.beats * beatWidth - 2, labelWidths[index]);
         label.style.transform = "translate3d(" + offset + "px,0,0)";
       });
       mini.style.transform = "translate3d(" + scrubberHeadX(p.beat, scrubberWidth) + "px,0,0)";
@@ -102,6 +113,7 @@ const PetalTimeline = (() => {
     function cancelCoast() {
       cancelAnimationFrame(coastID);
       coastID = 0;
+      visualScroll = null;
     }
     function cancelMotion() {
       cancelCoast();
@@ -248,9 +260,32 @@ const PetalTimeline = (() => {
       if (elapsed > 0) pointer.velocity = (pointer.lastX - event.clientX) / elapsed;
       pointer.lastX = event.clientX;
       pointer.lastTime = event.timeStamp;
-      seek((pointer.scroll - (event.clientX - pointer.x)) / beatWidth);
+      const rawScroll = pointer.scroll - (event.clientX - pointer.x);
+      visualScroll = rubberBand(rawScroll, previousWidth);
+      seek(rawScroll / beatWidth);
     });
+    function springBack(velocity = 0) {
+      const from = visualScroll ?? beat * beatWidth;
+      const boundary = position(from / beatWidth).scrollLeft;
+      const displacement = from - boundary;
+      if (reduced.matches || Math.abs(displacement) < .1) {
+        visualScroll = null; seek(boundary / beatWidth); return;
+      }
+      let origin;
+      const tick = now => {
+        if (destroyed) return;
+        origin ??= now;
+        const elapsed = now - origin;
+        const offset = springOffset(displacement, velocity, elapsed);
+        visualScroll = boundary + offset;
+        seek(boundary / beatWidth);
+        if (elapsed < 800 && Math.abs(offset) > .1) coastID = requestAnimationFrame(tick);
+        else { coastID = 0; visualScroll = null; update(); }
+      };
+      coastID = requestAnimationFrame(tick);
+    }
     function coast(velocity) {
+      visualScroll = null;
       if (reduced.matches || Math.abs(velocity) < .02) return;
       const startBeat = beat;
       let origin;
@@ -259,6 +294,12 @@ const PetalTimeline = (() => {
         origin ??= now;
         const elapsed = now - origin;
         const target = startBeat + dragDistance(velocity, elapsed) / beatWidth;
+        if (target < 0 || target > totalBeats) {
+          visualScroll = rubberBand(target * beatWidth, previousWidth);
+          seek(target);
+          springBack(velocity * Math.pow(.998, elapsed));
+          return;
+        }
         seek(target);
         if (target > 0 && target < totalBeats && Math.abs(velocity * Math.pow(.998, elapsed)) > .02) {
           coastID = requestAnimationFrame(tick);
@@ -271,7 +312,12 @@ const PetalTimeline = (() => {
       pointer = null;
       viewport.classList.remove("is-scrubbing");
       document.body.classList.remove("petal-timeline-dragging");
-      if (released && event?.type === "pointerup" && event.timeStamp - released.lastTime < 100) coast(released.velocity);
+      if (!released || destroyed) return;
+      if (visualScroll !== null && (visualScroll < 0 || visualScroll > totalBeats * beatWidth)) springBack();
+      else {
+        visualScroll = null;
+        if (event?.type === "pointerup" && event.timeStamp - released.lastTime < 100) coast(released.velocity);
+      }
     };
     const preventSelection = event => { if (pointer) event.preventDefault(); };
     document.addEventListener("selectstart", preventSelection);
@@ -317,5 +363,5 @@ const PetalTimeline = (() => {
       cancelMotion(); resize.disconnect(); visibility.disconnect();
     }};
   }
-  return {markup, attach, stickyOffset, position, motionPlan, scrubberEventX, scrubberHeadX, sectionEventCount, dragDistance};
+  return {markup, attach, stickyOffset, position, motionPlan, scrubberEventX, scrubberHeadX, sectionEventCount, dragDistance, rubberBand, springOffset};
 })();

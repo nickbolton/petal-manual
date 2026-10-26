@@ -226,3 +226,22 @@ test("fixed sparse events, random section counts, and continuous drag decelerati
   assert.ok(timeline.dragDistance(1, 200) - timeline.dragDistance(1, 100) < timeline.dragDistance(1, 100));
   assert.equal(timeline.dragDistance(-1, 100), -timeline.dragDistance(1, 100));
 });
+
+
+test("rubber band resists both ends and spring returns to the boundary", async () => {
+  const source = await readFile(new URL("../dist/timeline.js", import.meta.url), "utf8");
+  const timeline = vm.runInContext(source + "\nPetalTimeline", vm.createContext({}));
+  assert.equal(timeline.rubberBand(1000, 640), 1000);
+  for (const pull of [10, 100, 500, 2000]) {
+    const left = timeline.rubberBand(-pull, 640);
+    const right = timeline.rubberBand(2976 + pull, 640) - 2976;
+    assert.ok(left < 0 && left > -pull);
+    assert.ok(Math.abs(left + right) < 1e-9);
+    assert.ok(Math.abs(left) < 640);
+  }
+  for (const displacement of [-150, 150]) {
+    assert.equal(timeline.springOffset(displacement, 0, 0), displacement);
+    assert.ok(Math.abs(timeline.springOffset(displacement, 0, 800)) < .01);
+    assert.ok(Math.abs(timeline.springOffset(displacement, 0, 100)) < Math.abs(displacement));
+  }
+});
