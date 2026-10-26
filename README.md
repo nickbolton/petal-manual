@@ -52,7 +52,9 @@ inside their own section and leave one beat clear at its trailing edge. Play,
 pause, rewind, timeline dragging, keyboard seeking, and section jumping work
 locally without sending MIDI. Reduced-motion mode advances one bar per click.
 
-Playback uses requestAnimationFrame timestamps and a single translate3d layer for
-constant-speed subpixel motion. It does not animate native scroll positions or
-snap to beats. Only Play/Pause, Stop, and the section overview are presented as
+Playback uses transform-only Web Animations on the browser compositor, with one
+shared animation origin for the timeline, sticky headers, and overview marker.
+The JavaScript frame loop only updates captions and reports occasional events;
+it does not perform geometry reads or write motion styles during playback.
+Motion stays linear and does not snap to beats. Only Play/Pause, Stop, and the section overview are presented as
 buttons; ornamental navigation and settings controls are omitted.

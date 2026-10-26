@@ -52,3 +52,10 @@
 .petal-viewport{overflow-x:hidden}
 .petal-world{will-change:transform;transition:none!important;animation:none!important}
 .petal-section-label,.petal-mini-playhead{transition:none!important}
+
+/* Safari: promote independently animated headers, overview, and event rings.
+   Playback uses transform-only Web Animations with one shared timeline origin. */
+.petal-section-label,.petal-mini-playhead{will-change:transform;backface-visibility:hidden}
+.petal-mini-playhead{left:0}
+.petal-ripple-carrier{position:absolute;top:30px;left:0;margin-left:-100px;width:200px;height:200px;will-change:transform;pointer-events:none}
+.petal-ripple-carrier>.petal-ripple{top:0;left:0;margin:0;will-change:transform,opacity}

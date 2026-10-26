@@ -91,3 +91,28 @@ test("timeline motion stays linear at sub-beat positions", async () => {
   assert.ok(source.includes('world.style.transform = "translate3d("'));
   assert.ok(!source.includes("viewport.scrollLeft"));
 });
+
+
+test("Safari compositor motion shares a linear clock across timeline, labels, and overview", async () => {
+  const source = await readFile(new URL("../dist/timeline.js", import.meta.url), "utf8");
+  const timeline = vm.runInContext(source + "\nPetalTimeline", vm.createContext({}));
+  for (const beat of [0, 3.25, 16, 39.5]) {
+    const plan = timeline.motionPlan(beat, 640, [140, 150, 180], 520);
+    assert.equal(plan.duration, (48 - beat) * 500);
+    assert.equal(plan.world[0].transform, "translate3d(" + (-beat * 62) + "px,0,0)");
+    assert.equal(plan.world[1].transform, "translate3d(-2976px,0,0)");
+    for (const [index, frames] of plan.labels.entries()) {
+      assert.equal(frames[0].offset, 0);
+      assert.equal(frames.at(-1).offset, 1);
+      for (const frame of frames) {
+        const scroll = beat * 62 + frame.offset * (48 - beat) * 62;
+        const expected = timeline.stickyOffset(scroll, 640, index * 992, 990, [140, 150, 180][index]);
+        assert.equal(frame.transform, "translate3d(" + expected + "px,0,0)");
+      }
+    }
+  }
+  const frameLoop = source.slice(source.indexOf("    function frame() {"), source.indexOf("    function start() {"));
+  assert.ok(!frameLoop.includes(".style."));
+  assert.ok(!frameLoop.includes("clientWidth"));
+  assert.ok(source.includes("animation.startTime = origin"));
+});
