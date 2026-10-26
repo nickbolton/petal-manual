@@ -10,7 +10,7 @@ React Router framework mode, and Vite.
 https://github.com/user-attachments/assets/0997eeb6-a4d0-480e-b3b5-ef053e2da991
 
 The live timeline illustration includes smooth playback, sticky section headers,
-event ripples, momentum dragging, rubber-banding, and a draggable song overview.
+event ripples, momentum dragging, rubber-banding, and a draggable song overview scrubber.
 It is an interactive illustration; it does not send MIDI or play audio.
 
 ## Requirements
