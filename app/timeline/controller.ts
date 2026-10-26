@@ -21,6 +21,12 @@ export function rubberBand(scroll: number, width: number) {
   const dimension = Math.max(1, width);
   return boundary + Math.sign(excess) * dimension * .55 * Math.abs(excess) / (dimension + .55 * Math.abs(excess));
 }
+function rubberBandOrigin(scroll: number, width: number) {
+  const edge = position(scroll / beatWidth).scrollLeft;
+  const excess = scroll - edge;
+  const dimension = Math.max(1, width);
+  return edge + Math.sign(excess) * Math.abs(excess) * dimension / (.55 * Math.max(1, dimension - Math.abs(excess)));
+}
 export function springOffset(displacement: number, velocity: number, elapsed: number) {
   const damping = .018;
   return (displacement + (velocity + damping * displacement) * elapsed) * Math.exp(-damping * elapsed);
@@ -41,6 +47,14 @@ export function scrubberEventX(beat: number, width: number) {
 }
 export function scrubberHeadX(beat: number, width: number) {
   return Math.max(0, position(beat).beat * scrubberBeatWidth(width) - 2);
+}
+export function dragScroll(startScroll: number, fromX: number, toX: number, scale: number) {
+  return startScroll - (toX - fromX) / (scale || 1);
+}
+export function scrubberDragBeat(startBeat: number, deltaX: number, width: number, scale: number) {
+  const unit = scrubberBeatWidth(width);
+  if (!unit || scale <= 0) return position(startBeat).beat;
+  return position(startBeat + deltaX / (scale * unit)).beat;
 }
 export function motionPlan(fromBeat: number, viewportWidth: number, labelWidths: number[], scrubberWidth: number) {
   const start = position(fromBeat).scrollLeft;
@@ -91,8 +105,8 @@ export function attach(root: HTMLElement) {
   const reduced = matchMedia("(prefers-reduced-motion: reduce)");
   let beat = 0, playing = false, frameID = 0, lastBeat = -1, playbackStartBeat = 0;
   let coastID = 0, visualScroll: number | null = null;
-  let scrubPointer: {id:number; x:number; y:number; left:number; width:number; scale:number; dragging:boolean} | null = null, suppressSectionClick = false;
-  let pointer: {id:number; x:number; y:number; dragging:boolean; scroll:number; lastX:number; lastTime:number; velocity:number} | null = null;
+  let scrubPointer: {id:number; x:number; y:number; width:number; scale:number; beat:number; dragging:boolean} | null = null, suppressSectionClick = false;
+  let pointer: {id:number; x:number; y:number; dragging:boolean; scroll:number; scale:number; lastX:number; lastTime:number; velocity:number} | null = null;
   let labels: HTMLElement[] = [], labelWidths: number[] = [], destroyed = false;
   let previousWidth = 0, scrubberWidth = 0, animations: Animation[] = [], worldAnimation: Animation | null = null;
 
@@ -282,18 +296,22 @@ export function attach(root: HTMLElement) {
     seek(beat + delta * unit / beatWidth);
   }, {passive:false});
   listen(viewport, "pointerdown", event => {
-    if (event.button !== 0 || pageIsScrolling()) return;
+    if (event.isPrimary === false || event.button !== 0 || pageIsScrolling()) return;
     // Do not pause or capture until a deliberate horizontal drag is established.
-    pointer = {id:event.pointerId, x:event.clientX, y:event.clientY, dragging:false, scroll:0, lastX:event.clientX, lastTime:event.timeStamp, velocity:0};
+    const scroll = visualScroll === null ? currentBeat() * beatWidth : rubberBandOrigin(visualScroll, previousWidth);
+    // Catch existing momentum without snapping its currently rendered position.
+    cancelAnimationFrame(coastID);
+    coastID = 0;
+    const scale = viewport.getBoundingClientRect().width / viewport.clientWidth || 1;
+    pointer = {id:event.pointerId, x:event.clientX, y:event.clientY, dragging:false, scroll, scale, lastX:event.clientX, lastTime:event.timeStamp, velocity:0};
   });
-  listen(viewport, "pointermove", event => {
+  const moveDrag = (event: PointerEvent) => {
     if (!pointer || event.pointerId !== pointer.id) return;
     const dx = event.clientX - pointer.x, dy = event.clientY - pointer.y;
     if (!pointer.dragging) {
-      if (pageIsScrolling() || (Math.abs(dy) > 6 && Math.abs(dy) >= Math.abs(dx))) { pointer = null; return; }
+      if (pageIsScrolling() || (Math.abs(dy) > 6 && Math.abs(dy) >= Math.abs(dx))) { endDrag(); return; }
       if (Math.abs(dx) <= 6 || Math.abs(dx) <= Math.abs(dy)) return;
       pause();
-      pointer.scroll = beat * beatWidth;
       pointer.dragging = true;
       viewport.focus({preventScroll:true});
       document.getSelection?.()?.removeAllRanges();
@@ -303,13 +321,14 @@ export function attach(root: HTMLElement) {
     }
     event.preventDefault();
     const elapsed = event.timeStamp - pointer.lastTime;
-    if (elapsed > 0) pointer.velocity = (pointer.lastX - event.clientX) / elapsed / interactionScale;
+    if (elapsed > 0) pointer.velocity = (pointer.lastX - event.clientX) / elapsed / pointer.scale;
     pointer.lastX = event.clientX;
     pointer.lastTime = event.timeStamp;
-    const rawScroll = pointer.scroll - dx / interactionScale;
+    const rawScroll = dragScroll(pointer.scroll, pointer.x, event.clientX, pointer.scale);
     visualScroll = rubberBand(rawScroll, previousWidth);
     seek(rawScroll / beatWidth);
-  });
+  };
+  listen(viewport, "pointermove", moveDrag);
   function springBack(velocity = 0) {
     const from = visualScroll ?? beat * beatWidth;
     const boundary = position(from / beatWidth).scrollLeft;
@@ -354,15 +373,18 @@ export function attach(root: HTMLElement) {
     coastID = requestAnimationFrame(tick);
   }
   const endDrag = (event?: PointerEvent) => {
+    if (event && pointer && event.pointerId !== pointer.id) return;
+    if (event?.type === "pointerup" && pointer?.dragging && event.clientX !== pointer.lastX) moveDrag(event);
     const released = pointer;
     pointer = null;
     viewport.classList.remove("is-scrubbing");
     document.body.classList.remove("petal-timeline-dragging");
-    if (!released?.dragging || destroyed) return;
+    if (!released || destroyed) return;
+    if (!released.dragging && visualScroll === null) return;
     if (visualScroll !== null && (visualScroll < 0 || visualScroll > totalBeats * beatWidth)) springBack();
     else {
       visualScroll = null;
-      if (event?.type === "pointerup" && event.timeStamp - released.lastTime < 100) coast(released.velocity);
+      if (released.dragging && event?.type === "pointerup" && event.timeStamp - released.lastTime < 100) coast(released.velocity);
     }
   };
   const preventSelection = (event: Event) => { if (pointer?.dragging || scrubPointer?.dragging) event.preventDefault(); };
@@ -378,21 +400,17 @@ export function attach(root: HTMLElement) {
   });
   const scrubToPointer = (clientX: number) => {
     if (!scrubPointer || scrubPointer.width <= 0) return;
-    const x = (clientX - scrubPointer.left) / scrubPointer.scale;
-    const unit = scrubberBeatWidth(scrubPointer.width);
-    const section = sections.find(s => x >= s.start * unit && x <= (s.start + s.beats) * unit - 2);
-    // Native scrubber maps within the section's visible strip, including its gaps.
-    const target = section
-      ? section.start + Math.max(0, Math.min(1, (x - section.start * unit) / (section.beats * unit - 2))) * section.beats
-      : x / scrubPointer.width * totalBeats;
+    // Move the playhead by the finger's displacement, preserving the grab
+    // offset instead of jumping the playhead to an absolute touch location.
+    const target = scrubberDragBeat(scrubPointer.beat, clientX - scrubPointer.x, scrubPointer.width, scrubPointer.scale);
     seek(target);
   };
   listen(scrubber, "pointerdown", event => {
-    if (event.button !== 0) return;
+    if (event.isPrimary === false || event.button !== 0) return;
     suppressSectionClick = pageIsScrolling();
     if (suppressSectionClick) return;
     const bounds = scrubber.getBoundingClientRect();
-    scrubPointer = {id:event.pointerId, x:event.clientX, y:event.clientY, left:bounds.left, width:scrubber.clientWidth, scale:bounds.width / scrubber.clientWidth || 1, dragging:false};
+    scrubPointer = {id:event.pointerId, x:event.clientX, y:event.clientY, width:scrubber.clientWidth, scale:bounds.width / scrubber.clientWidth || 1, beat:currentBeat(), dragging:false};
   });
   listen(scrubber, "pointermove", event => {
     if (!scrubPointer || scrubPointer.id !== event.pointerId) return;
@@ -411,7 +429,7 @@ export function attach(root: HTMLElement) {
     scrubToPointer(event.clientX);
   });
   const endScrub = (event?: PointerEvent) => {
-    if (!scrubPointer) return;
+    if (!scrubPointer || (event && event.pointerId !== scrubPointer.id)) return;
     if (event?.type === "pointerup" && scrubPointer.dragging) scrubToPointer(event.clientX);
     scrubPointer = null;
     document.body.classList.remove("petal-timeline-dragging");

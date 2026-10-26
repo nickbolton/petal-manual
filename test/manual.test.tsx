@@ -177,7 +177,7 @@ test("React Strict Mode remounts without duplicate timeline handlers; gestures a
   const setCapture=()=>{};
   Object.defineProperty(windows.HTMLElement.prototype,"clientWidth",{get(){return this.classList.contains("petal-screen-frame")?screenFrameWidth:640;}});
   Object.defineProperty(windows.HTMLElement.prototype,"offsetWidth",{get(){return this.classList.contains("petal-screen")?640:140;}});
-  windows.HTMLElement.prototype.getBoundingClientRect=function(){const width=this.classList.contains("petal-scrubber")?screenFrameWidth:640;return {left:0,width,top:0,right:width,bottom:260,height:260,x:0,y:0,toJSON(){}};};
+  windows.HTMLElement.prototype.getBoundingClientRect=function(){const width=(this.classList.contains("petal-scrubber")||this.classList.contains("petal-viewport"))?screenFrameWidth:640;return {left:0,width,top:0,right:width,bottom:260,height:260,x:0,y:0,toJSON(){}};};
   windows.HTMLElement.prototype.setPointerCapture=setCapture;
   windows.HTMLElement.prototype.animate=function(){const a={currentTime:0,cancel(){this.cancelled=true;}};animations.push(a);return a as unknown as Animation;};
   Object.defineProperty(windows.document,"timeline",{value:{currentTime:100}});
@@ -194,9 +194,9 @@ test("React Strict Mode remounts without duplicate timeline handlers; gestures a
     const viewport=windows.document.getElementById("demo-viewport")!;
     const play=windows.document.getElementById("demo-play")!;
     const mini=windows.document.getElementById("demo-mini-head")!.parentElement!;
-    const pointer=(target:Element,type:string,x:number,time:number,y=100)=>{
+    const pointer=(target:Element,type:string,x:number,time:number,y=100,properties:Record<string,unknown>={})=>{
       const event=new windows.Event(type,{bubbles:true,cancelable:true});
-      Object.assign(event,{button:0,pointerId:1,clientX:x,clientY:y});Object.defineProperty(event,"timeStamp",{value:time});target.dispatchEvent(event);
+      Object.assign(event,{button:0,pointerId:1,clientX:x,clientY:y,isPrimary:true,pointerType:"mouse",...properties});Object.defineProperty(event,"timeStamp",{value:time});target.dispatchEvent(event);
     };
     play.click();assert.equal(play.getAttribute("aria-pressed"),"true");assert.equal(animations.length,5);
     play.click();assert.equal(play.getAttribute("aria-pressed"),"false");
@@ -218,12 +218,20 @@ test("React Strict Mode remounts without duplicate timeline handlers; gestures a
     // Half-size rendering preserves logical song geometry and pointer accuracy.
     screenFrameWidth=320;resizeCallback!();
     assert.equal(windows.document.querySelector<HTMLElement>(".petal-screen-frame")!.style.getPropertyValue("--petal-screen-scale"),"0.5");
-    pointer(viewport,"pointerdown",300,90);pointer(viewport,"pointermove",200,110);
+    pointer(viewport,"pointerdown",300,90,100,{pointerType:"touch"});pointer(viewport,"pointermove",200,110,100,{pointerType:"touch"});
     assert.equal(windows.document.getElementById("demo-world")!.style.transform,"translate3d(-200px,0,0)");
-    pointer(viewport,"pointercancel",200,120);
+    pointer(viewport,"pointerdown",250,115,100,{pointerId:2,isPrimary:false,pointerType:"touch"});
+    pointer(viewport,"pointerup",250,117,100,{pointerId:2,isPrimary:false,pointerType:"touch"});
+    assert.equal(windows.document.body.classList.contains("petal-timeline-dragging"),true);
+    pointer(viewport,"pointerup",180,120,100,{pointerType:"touch"});
+    assert.equal(windows.document.getElementById("demo-world")!.style.transform,"translate3d(-240px,0,0)");
     windows.document.getElementById("demo-stop")!.click();
-    pointer(mini,"pointerdown",100,130);pointer(mini,"pointermove",160,150);
+    mini.querySelectorAll<HTMLButtonElement>("button")[1].click();
+    const headBefore=Number.parseFloat(windows.document.getElementById("demo-mini-head")!.style.transform.slice(12));
+    pointer(mini,"pointerdown",100,130,100,{pointerType:"touch"});pointer(mini,"pointermove",160,150,100,{pointerType:"touch"});
     assert.match(windows.document.getElementById("demo-position")!.textContent!,/Verse · Bar 7/);
+    const headAfter=Number.parseFloat(windows.document.getElementById("demo-mini-head")!.style.transform.slice(12));
+    assert.ok(Math.abs((headAfter-headBefore)*.5-60)<1e-8);
     pointer(mini,"pointercancel",160,160);
     windows.document.getElementById("demo-stop")!.click();
     screenFrameWidth=640;resizeCallback!();
@@ -322,4 +330,22 @@ test("mobile screen scale preserves the composition aspect ratio",async()=>{
   assert.equal(timeline.screenScale(0,720),1);
   const document=new JSDOM(renderToStaticMarkup(<Timeline/>)).window.document;
   assert.ok(document.querySelector(".petal-screen-frame>.petal-screen .petal-scrubber"));
+});
+
+
+test("touch displacement is one-to-one at every scale without reanchoring the scrubber",()=>{
+  for(const scale of [.38,.4777777778,.75,1]){
+    for(const delta of [-60,-20,0,20,60]){
+      const start=1000;
+      const scroll=timeline.dragScroll(start,120,120+delta,scale);
+      assert.ok(Math.abs((start-scroll)*scale-delta)<1e-8);
+      const width=600,beat=24;
+      const target=timeline.scrubberDragBeat(beat,delta,width,scale);
+      const movement=(timeline.scrubberHeadX(target,width)-timeline.scrubberHeadX(beat,width))*scale;
+      assert.ok(Math.abs(movement-delta)<1e-8);
+    }
+    assert.equal(timeline.scrubberDragBeat(.1,0,600,scale),.1);
+    assert.equal(timeline.scrubberDragBeat(24,-10000,600,scale),0);
+    assert.equal(timeline.scrubberDragBeat(24,10000,600,scale),48);
+  }
 });
