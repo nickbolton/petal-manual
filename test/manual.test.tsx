@@ -233,16 +233,21 @@ test("React Strict Mode remounts without duplicate timeline handlers; gestures a
     assert.equal(windows.document.getElementById("demo-world")!.style.transform,"translate3d(-240px,0,0)");
     windows.document.getElementById("demo-stop")!.click();
     mini.querySelectorAll<HTMLButtonElement>("button")[1].click();
-    const headBefore=Number.parseFloat(windows.document.getElementById("demo-mini-head")!.style.transform.slice(12));
-    pointer(mini,"pointerdown",100,130,100,{pointerType:"touch"});pointer(mini,"pointermove",160,150,100,{pointerType:"touch"});
+    pointer(mini,"pointerdown",100,130,100,{pointerType:"touch"});
+    const headDown=Number.parseFloat(windows.document.getElementById("demo-mini-head")!.style.transform.slice(12));
+    assert.ok(Math.abs((headDown+1)*.5-100)<1e-8);
+    pointer(mini,"pointermove",103,135,100,{pointerType:"touch"});
+    const smallMove=Number.parseFloat(windows.document.getElementById("demo-mini-head")!.style.transform.slice(12));
+    assert.ok(Math.abs((smallMove+1)*.5-103)<1e-8);
+    pointer(mini,"pointermove",160,150,100,{pointerType:"touch"});
     assert.match(windows.document.getElementById("demo-position")!.textContent!,/Verse · Bar 7/);
     const headAfter=Number.parseFloat(windows.document.getElementById("demo-mini-head")!.style.transform.slice(12));
-    assert.ok(Math.abs((headAfter-headBefore)*.5-60)<1e-8);
+    assert.ok(Math.abs((headAfter+1)*.5-160)<1e-8);
     pointer(mini.querySelector("button span")!,"lostpointercapture",160,151,100,{pointerType:"touch"});
     assert.equal(windows.document.body.classList.contains("petal-timeline-dragging"),true);
     pointer(mini,"pointermove",180,155,100,{pointerType:"touch"});
     const nextHead=Number.parseFloat(windows.document.getElementById("demo-mini-head")!.style.transform.slice(12));
-    assert.ok(Math.abs((nextHead-headBefore)*.5-80)<1e-8);
+    assert.ok(Math.abs((nextHead+1)*.5-180)<1e-8);
     // Losing capture on the surface itself still terminates the gesture.
     pointer(mini,"lostpointercapture",180,160,100,{pointerType:"touch"});
     assert.equal(windows.document.body.classList.contains("petal-timeline-dragging"),false);
@@ -269,6 +274,7 @@ test("React Strict Mode remounts without duplicate timeline handlers; gestures a
     clock+=250;
     pointer(viewport,"pointerdown",100,140);pointer(viewport,"pointermove",102,160,180);
     assert.equal(play.getAttribute("aria-pressed"),"true");
+    windows.dispatchEvent(new windows.Event("scroll"));
     pointer(mini,"pointerdown",100,170);pointer(mini,"pointermove",102,190,180);
     assert.equal(play.getAttribute("aria-pressed"),"true");
     section.dispatchEvent(new windows.MouseEvent("click",{bubbles:true,cancelable:true,detail:1}));
@@ -346,19 +352,20 @@ test("mobile screen scale preserves the composition aspect ratio",async()=>{
 });
 
 
-test("touch displacement is one-to-one at every scale without reanchoring the scrubber",()=>{
+test("timeline drags remain relative while scrubber seeks align with absolute touch positions",()=>{
   for(const scale of [.38,.4777777778,.75,1]){
     for(const delta of [-60,-20,0,20,60]){
       const start=1000;
       const scroll=timeline.dragScroll(start,120,120+delta,scale);
       assert.ok(Math.abs((start-scroll)*scale-delta)<1e-8);
-      const width=600,beat=24;
-      const target=timeline.scrubberDragBeat(beat,delta,width,scale);
-      const movement=(timeline.scrubberHeadX(target,width)-timeline.scrubberHeadX(beat,width))*scale;
-      assert.ok(Math.abs(movement-delta)<1e-8);
     }
-    assert.equal(timeline.scrubberDragBeat(.1,0,600,scale),.1);
-    assert.equal(timeline.scrubberDragBeat(24,-10000,600,scale),0);
-    assert.equal(timeline.scrubberDragBeat(24,10000,600,scale),48);
+    const width=600;
+    for(const x of [10,30,60,100]){
+      const beat=timeline.scrubberBeatAtX(x,width,scale);
+      const headCenter=(timeline.scrubberHeadX(beat,width)+1)*scale;
+      assert.ok(Math.abs(headCenter-x)<1e-8);
+    }
+    assert.equal(timeline.scrubberBeatAtX(-100,width,scale),0);
+    assert.equal(timeline.scrubberBeatAtX(10000,width,scale),48);
   }
 });

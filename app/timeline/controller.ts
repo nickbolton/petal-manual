@@ -51,10 +51,12 @@ export function scrubberHeadX(beat: number, width: number) {
 export function dragScroll(startScroll: number, fromX: number, toX: number, scale: number) {
   return startScroll - (toX - fromX) / (scale || 1);
 }
-export function scrubberDragBeat(startBeat: number, deltaX: number, width: number, scale: number) {
+export function scrubberBeatAtX(x: number, width: number, scale: number) {
   const unit = scrubberBeatWidth(width);
-  if (!unit || scale <= 0) return position(startBeat).beat;
-  return position(startBeat + deltaX / (scale * unit)).beat;
+  if (x <= 0 || !unit || scale <= 0) return 0;
+  // scrubberHeadX positions the left edge of a two-point playhead; align its
+  // center with the pointer, including the native two-point leading offset.
+  return position((x / scale + 1) / unit).beat;
 }
 export function motionPlan(fromBeat: number, viewportWidth: number, labelWidths: number[], scrubberWidth: number) {
   const start = position(fromBeat).scrollLeft;
@@ -105,7 +107,7 @@ export function attach(root: HTMLElement) {
   const reduced = matchMedia("(prefers-reduced-motion: reduce)");
   let beat = 0, playing = false, frameID = 0, lastBeat = -1, playbackStartBeat = 0;
   let coastID = 0, visualScroll: number | null = null;
-  let scrubPointer: {id:number; x:number; y:number; width:number; scale:number; beat:number; dragging:boolean} | null = null, suppressSectionClick = false;
+  let scrubPointer: {id:number; x:number; y:number; left:number; width:number; scale:number; dragging:boolean} | null = null, suppressSectionClick = false;
   let pointer: {id:number; x:number; y:number; dragging:boolean; scroll:number; scale:number; lastX:number; lastTime:number; velocity:number} | null = null;
   let labels: HTMLElement[] = [], labelWidths: number[] = [], destroyed = false;
   let previousWidth = 0, scrubberWidth = 0, animations: Animation[] = [], worldAnimation: Animation | null = null;
@@ -403,9 +405,7 @@ export function attach(root: HTMLElement) {
   });
   const scrubToPointer = (clientX: number) => {
     if (!scrubPointer || scrubPointer.width <= 0) return;
-    // Move the playhead by the finger's displacement, preserving the grab
-    // offset instead of jumping the playhead to an absolute touch location.
-    const target = scrubberDragBeat(scrubPointer.beat, clientX - scrubPointer.x, scrubPointer.width, scrubPointer.scale);
+    const target = scrubberBeatAtX(clientX - scrubPointer.left, scrubPointer.width, scrubPointer.scale);
     seek(target);
   };
   listen(scrubber, "pointerdown", event => {
@@ -413,16 +413,22 @@ export function attach(root: HTMLElement) {
     suppressSectionClick = pageIsScrolling();
     if (suppressSectionClick) return;
     const bounds = scrubber.getBoundingClientRect();
-    scrubPointer = {id:event.pointerId, x:event.clientX, y:event.clientY, width:scrubber.clientWidth, scale:bounds.width / scrubber.clientWidth || 1, beat:currentBeat(), dragging:false};
+    scrubPointer = {id:event.pointerId, x:event.clientX, y:event.clientY, left:bounds.left, width:scrubber.clientWidth, scale:bounds.width / scrubber.clientWidth || 1, dragging:false};
+    suppressSectionClick = true;
+    pause();
+    scrubToPointer(event.clientX);
+    scrubber.setPointerCapture(event.pointerId);
   });
   listen(scrubber, "pointermove", event => {
     if (!scrubPointer || scrubPointer.id !== event.pointerId) return;
     if (!scrubPointer.dragging) {
       const dx = Math.abs(event.clientX - scrubPointer.x), dy = Math.abs(event.clientY - scrubPointer.y);
       if (pageIsScrolling() || (dy > 6 && dy >= dx)) { scrubPointer = null; suppressSectionClick = true; return; }
-      if (dx <= 6 || dx <= dy) return;
+      if (dx <= 6 || dx <= dy) {
+        if (dx >= dy) scrubToPointer(event.clientX);
+        return;
+      }
       pause();
-      scrubber.setPointerCapture(event.pointerId);
       scrubPointer.dragging = true;
       suppressSectionClick = true;
       document.getSelection?.()?.removeAllRanges();
@@ -433,7 +439,7 @@ export function attach(root: HTMLElement) {
   });
   const endScrub = (event?: PointerEvent) => {
     if (!scrubPointer || (event && event.pointerId !== scrubPointer.id)) return;
-    if (event?.type === "pointerup" && scrubPointer.dragging) scrubToPointer(event.clientX);
+    if (event?.type === "pointerup") scrubToPointer(event.clientX);
     scrubPointer = null;
     document.body.classList.remove("petal-timeline-dragging");
   };
