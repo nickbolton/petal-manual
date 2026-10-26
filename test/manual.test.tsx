@@ -169,20 +169,22 @@ test("React Strict Mode remounts without duplicate timeline handlers; gestures a
   const animations: {currentTime:number;cancelled?:boolean;cancel():void}[]=[];
   const frames=new Map<number,FrameRequestCallback>();let frame=0;
   const reducedMotion={matches:false};
+  let screenFrameWidth=640;
+  let resizeCallback: (()=>void) | undefined;
   let clock=1000;
   const nativePerformance=globalThis.performance;
   set("performance",new Proxy(nativePerformance,{get(target,key){if(key==="now")return ()=>clock;const value=Reflect.get(target,key,target);return typeof value==="function"?value.bind(target):value;}}));
   const setCapture=()=>{};
-  Object.defineProperty(windows.HTMLElement.prototype,"clientWidth",{get:()=>640});
-  Object.defineProperty(windows.HTMLElement.prototype,"offsetWidth",{get:()=>140});
-  windows.HTMLElement.prototype.getBoundingClientRect=()=>({left:0,width:640,top:0,right:640,bottom:260,height:260,x:0,y:0,toJSON(){}});
+  Object.defineProperty(windows.HTMLElement.prototype,"clientWidth",{get(){return this.classList.contains("petal-screen-frame")?screenFrameWidth:640;}});
+  Object.defineProperty(windows.HTMLElement.prototype,"offsetWidth",{get(){return this.classList.contains("petal-screen")?640:140;}});
+  windows.HTMLElement.prototype.getBoundingClientRect=function(){const width=this.classList.contains("petal-scrubber")?screenFrameWidth:640;return {left:0,width,top:0,right:width,bottom:260,height:260,x:0,y:0,toJSON(){}};};
   windows.HTMLElement.prototype.setPointerCapture=setCapture;
   windows.HTMLElement.prototype.animate=function(){const a={currentTime:0,cancel(){this.cancelled=true;}};animations.push(a);return a as unknown as Animation;};
   Object.defineProperty(windows.document,"timeline",{value:{currentTime:100}});
   Object.defineProperty(windows.document,"fonts",{value:{ready:Promise.resolve()}});
   set("window",windows);set("document",windows.document);set("HTMLElement",windows.HTMLElement);set("IS_REACT_ACT_ENVIRONMENT",true);
   set("matchMedia",()=>reducedMotion);set("requestAnimationFrame",(callback:FrameRequestCallback)=>{frames.set(++frame,callback);return frame;});set("cancelAnimationFrame",(id:number)=>frames.delete(id));
-  set("ResizeObserver",class{observe(){}disconnect(){}});
+  set("ResizeObserver",class{constructor(callback:()=>void){resizeCallback=callback;}observe(){}disconnect(){}});
   set("IntersectionObserver",class{entry:{callback:IntersectionObserverCallback;disconnected?:boolean};constructor(callback:IntersectionObserverCallback){this.entry={callback};observers.push(this.entry);}observe(){}disconnect(){this.entry.disconnected=true;}});
   const root=createRoot(windows.document.getElementById("root")!);
   try {
@@ -213,6 +215,19 @@ test("React Strict Mode remounts without duplicate timeline handlers; gestures a
     assert.match(windows.document.getElementById("demo-position")!.textContent!,/Verse/);
     pointer(mini,"pointerup",1000,70);assert.match(windows.document.getElementById("demo-position")!.textContent!,/Bar 12/);
     const section=mini.querySelector<HTMLButtonElement>("button")!;section.click();assert.match(windows.document.getElementById("demo-position")!.textContent!,/Bar 1/);
+    // Half-size rendering preserves logical song geometry and pointer accuracy.
+    screenFrameWidth=320;resizeCallback!();
+    assert.equal(windows.document.querySelector<HTMLElement>(".petal-screen-frame")!.style.getPropertyValue("--petal-screen-scale"),"0.5");
+    pointer(viewport,"pointerdown",300,90);pointer(viewport,"pointermove",200,110);
+    assert.equal(windows.document.getElementById("demo-world")!.style.transform,"translate3d(-200px,0,0)");
+    pointer(viewport,"pointercancel",200,120);
+    windows.document.getElementById("demo-stop")!.click();
+    pointer(mini,"pointerdown",100,130);pointer(mini,"pointermove",160,150);
+    assert.match(windows.document.getElementById("demo-position")!.textContent!,/Verse · Bar 7/);
+    pointer(mini,"pointercancel",160,160);
+    windows.document.getElementById("demo-stop")!.click();
+    screenFrameWidth=640;resizeCallback!();
+    assert.equal(windows.document.querySelector<HTMLElement>(".petal-screen-frame")!.style.getPropertyValue("--petal-screen-scale"),"1");
     // Vertical wheel gestures can begin outside the illustration, then drift
     // diagonally over it during momentum without seeking or cancelling playback.
     play.click();
@@ -294,4 +309,17 @@ test("theme preference survives remounts and bootstraps before hydration",async(
   }finally{
     for(const [key,descriptor] of old){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else Reflect.deleteProperty(globalThis,key);}dom.window.close();
   }
+});
+
+
+test("mobile screen scale preserves the composition aspect ratio",async()=>{
+  for(const width of [274,329,344,384,714]){
+    const scale=timeline.screenScale(width,720);
+    assert.equal(720*scale,width);
+    assert.ok(Math.abs(width/(400*scale)-720/400)<1e-9);
+  }
+  assert.equal(timeline.screenScale(900,720),1);
+  assert.equal(timeline.screenScale(0,720),1);
+  const document=new JSDOM(renderToStaticMarkup(<Timeline/>)).window.document;
+  assert.ok(document.querySelector(".petal-screen-frame>.petal-screen .petal-scrubber"));
 });

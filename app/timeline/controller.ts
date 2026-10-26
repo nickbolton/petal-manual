@@ -1,6 +1,9 @@
 
 export const beatWidth = 62;
 export const totalBeats = 48;
+export function screenScale(availableWidth: number, layoutWidth: number) {
+  return availableWidth > 0 && layoutWidth > 0 ? Math.min(1, availableWidth / layoutWidth) : 1;
+}
 export const sections = [
   { name: "Intro", start: 0, beats: 16, color: "#3194FA" },
   { name: "Verse", start: 16, beats: 16, color: "#66BD48" },
@@ -75,6 +78,9 @@ export function attach(root: HTMLElement) {
     target.addEventListener(name, handler, options);
     cleanup.push(() => target.removeEventListener(name, handler, options));
   }
+  const screenFrame = root.querySelector<HTMLElement>(".petal-screen-frame")!;
+  const screen = root.querySelector<HTMLElement>(".petal-screen")!;
+  let interactionScale = 1;
   const world = find("demo-world");
   const play = find("demo-play");
   const stop = find("demo-stop");
@@ -85,7 +91,7 @@ export function attach(root: HTMLElement) {
   const reduced = matchMedia("(prefers-reduced-motion: reduce)");
   let beat = 0, playing = false, frameID = 0, lastBeat = -1, playbackStartBeat = 0;
   let coastID = 0, visualScroll: number | null = null;
-  let scrubPointer: {id:number; x:number; y:number; left:number; width:number; dragging:boolean} | null = null, suppressSectionClick = false;
+  let scrubPointer: {id:number; x:number; y:number; left:number; width:number; scale:number; dragging:boolean} | null = null, suppressSectionClick = false;
   let pointer: {id:number; x:number; y:number; dragging:boolean; scroll:number; lastX:number; lastTime:number; velocity:number} | null = null;
   let labels: HTMLElement[] = [], labelWidths: number[] = [], destroyed = false;
   let previousWidth = 0, scrubberWidth = 0, animations: Animation[] = [], worldAnimation: Animation | null = null;
@@ -210,6 +216,13 @@ export function attach(root: HTMLElement) {
     frameID = requestAnimationFrame(frame);
   }
   function buildWorld() {
+    // client/offset dimensions stay in the desktop canvas coordinate space.
+    // Only the outer screen is scaled; playback keeps its existing clock/layers.
+    const scale = screenScale(screenFrame.clientWidth, screen.offsetWidth);
+    if (scale !== interactionScale || !screenFrame.style.getPropertyValue("--petal-screen-scale")) {
+      interactionScale = scale;
+      screenFrame.style.setProperty("--petal-screen-scale", String(scale));
+    }
     const width = viewport.clientWidth;
     const overviewWidth = scrubber.clientWidth;
     if (width === previousWidth && overviewWidth === scrubberWidth) return;
@@ -265,7 +278,7 @@ export function attach(root: HTMLElement) {
     const delta = event.shiftKey ? event.deltaY || event.deltaX : event.deltaX;
     if (!delta) return;
     event.preventDefault(); pause();
-    const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? previousWidth : 1;
+    const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? previousWidth : 1 / interactionScale;
     seek(beat + delta * unit / beatWidth);
   }, {passive:false});
   listen(viewport, "pointerdown", event => {
@@ -290,10 +303,10 @@ export function attach(root: HTMLElement) {
     }
     event.preventDefault();
     const elapsed = event.timeStamp - pointer.lastTime;
-    if (elapsed > 0) pointer.velocity = (pointer.lastX - event.clientX) / elapsed;
+    if (elapsed > 0) pointer.velocity = (pointer.lastX - event.clientX) / elapsed / interactionScale;
     pointer.lastX = event.clientX;
     pointer.lastTime = event.timeStamp;
-    const rawScroll = pointer.scroll - dx;
+    const rawScroll = pointer.scroll - dx / interactionScale;
     visualScroll = rubberBand(rawScroll, previousWidth);
     seek(rawScroll / beatWidth);
   });
@@ -365,7 +378,7 @@ export function attach(root: HTMLElement) {
   });
   const scrubToPointer = (clientX: number) => {
     if (!scrubPointer || scrubPointer.width <= 0) return;
-    const x = clientX - scrubPointer.left;
+    const x = (clientX - scrubPointer.left) / scrubPointer.scale;
     const unit = scrubberBeatWidth(scrubPointer.width);
     const section = sections.find(s => x >= s.start * unit && x <= (s.start + s.beats) * unit - 2);
     // Native scrubber maps within the section's visible strip, including its gaps.
@@ -379,7 +392,7 @@ export function attach(root: HTMLElement) {
     suppressSectionClick = pageIsScrolling();
     if (suppressSectionClick) return;
     const bounds = scrubber.getBoundingClientRect();
-    scrubPointer = {id:event.pointerId, x:event.clientX, y:event.clientY, left:bounds.left, width:bounds.width, dragging:false};
+    scrubPointer = {id:event.pointerId, x:event.clientX, y:event.clientY, left:bounds.left, width:scrubber.clientWidth, scale:bounds.width / scrubber.clientWidth || 1, dragging:false};
   });
   listen(scrubber, "pointermove", event => {
     if (!scrubPointer || scrubPointer.id !== event.pointerId) return;
@@ -412,6 +425,7 @@ export function attach(root: HTMLElement) {
   }, true);
   root.querySelectorAll<HTMLElement>(".petal-mini-section").forEach(button => listen(button, "click", () => { pause(); seek(Number(button.dataset.beat)); }));
   const resize = new ResizeObserver(buildWorld);
+  resize.observe(screenFrame);
   resize.observe(viewport);
   resize.observe(scrubber);
   buildWorld();

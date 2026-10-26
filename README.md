@@ -217,7 +217,9 @@ Restore service with `web=1`.
 
 The illustration follows Petal's iOS dimensions and styling: 60-point beats with
 2-point dividers, 48-point section titles, 16-point section corners, a stationary
-200-point playhead, and a 48-point overview with 4-point event dots.
+200-point playhead, and a 48-point overview with 4-point event dots. At the
+smallest breakpoint (760px and below), the complete 720 × 400 composition scales
+to the available width. Drag and scrubber coordinates account for the scale.
 
 Playback uses transform-only Web Animations with a shared clock for the timeline,
 sticky headers, and overview marker. React renders the interface; the dedicated

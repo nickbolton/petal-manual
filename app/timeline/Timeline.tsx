@@ -11,7 +11,7 @@ export function Timeline() {
   }, []);
   return <figure className="petal-demo" ref={root}>
     <div className="petal-figure-heading"><span>A SONG IN MOTION</span><span>INTERACTIVE APP ILLUSTRATION</span></div>
-    <div className="petal-screen">
+    <div className="petal-screen-frame"><div className="petal-screen">
       <div className="petal-toolbar"><div className="petal-toolbar-left">
         <button id="demo-play" className="petal-control" aria-label="Play illustration" aria-pressed="false"><span className="petal-icon petal-icon-play" aria-hidden="true"/></button>
         <button id="demo-stop" className="petal-control" aria-label="Stop and rewind illustration"><span className="petal-icon petal-icon-stop" aria-hidden="true"/></button>
@@ -30,7 +30,7 @@ export function Timeline() {
         {events.map(beat => <span key={beat} className="petal-mini-event" data-beat={beat} aria-hidden="true"/>)}
         <span id="demo-mini-head" className="petal-mini-playhead" aria-hidden="true"/>
       </div>
-    </div>
+    </div></div>
     <figcaption className="petal-caption"><span>FIG. 01 &nbsp; The playhead stays still. Your song moves.</span><span id="demo-position">Intro · Bar 1 of 12</span></figcaption>
     <p className="petal-demo-help">The illustration plays when it comes into view. Pause it, drag the timeline, or pan the overview. Section titles stick at the leading edge until the next section takes over. Illustration only; no MIDI or audio is sent.</p>
   </figure>;

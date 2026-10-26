@@ -41,7 +41,15 @@
 .petal-caption{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;color:var(--muted);font:9px ui-monospace,monospace;letter-spacing:.3px;margin-top:15px;line-height:1.7}
 .petal-demo-help{font-size:11px;color:var(--muted);line-height:1.8;margin:9px 0 0}
 @media(max-width:1150px){.petal-toolbar-word{display:none}.petal-toolbar-right{gap:4px}}
-@media(max-width:760px){.petal-toolbar{padding:0 10px;gap:0}.petal-song-title strong,.petal-song-title>span{font-size:13px}.petal-settings,.petal-toolbar-left>.petal-decoration{display:none}.petal-toolbar-right{gap:0}.petal-control,.petal-decoration{width:30px}.petal-icon{width:23px;height:23px}.petal-figure-heading{font-size:8px}.petal-figure-heading span:last-child{max-width:120px;text-align:right}.petal-scrubber{margin:0 30px}.petal-stage{height:260px}.petal-caption{font-size:8px}}
+/* Scale the complete desktop composition on small screens, rather than
+   shrinking individual controls while leaving a full-height timeline. */
+@media(max-width:760px){
+  .petal-screen-frame{position:relative;aspect-ratio:720 / 400;overflow:hidden}
+  .petal-screen{position:absolute;top:0;left:0;width:720px;max-width:none;transform:scale(var(--petal-screen-scale,1));transform-origin:top left;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+  .petal-figure-heading{font-size:8px}
+  .petal-figure-heading span:last-child{max-width:120px;text-align:right}
+  .petal-caption{font-size:8px}
+}
 @media(prefers-reduced-motion:reduce){.petal-ripple{display:none}}
 @media print{.petal-screen{print-color-adjust:exact;-webkit-print-color-adjust:exact}.petal-demo-help{display:none}}
 
