@@ -4,7 +4,7 @@
   const content = $("chapter-content");
   const dialog = $("search-dialog");
   let current = "";
-  let animation = 0;
+  let activeDemo;
   let observer;
   let lastSearchFocus;
   const plain = (html) => { const el = document.createElement("div"); el.innerHTML = html; return el.textContent || ""; };
@@ -20,38 +20,8 @@
     if (group !== chapter.group) { group = chapter.group; heading = '<div class="nav-group">' + escape(group) + '</div>'; }
     return heading + '<a class="chapter-link" href="#' + chapter.id + '" data-chapter="' + chapter.id + '"><span class="num">' + String(index + 1).padStart(2, "0") + '</span><span>' + escape(chapter.title) + '</span></a>';
   }).join("");
-  function hero() {
-    return '<div class="hero-console"><div class="console-top"><span>A SONG IN MOTION</span><b>● ILLUSTRATIVE TIMELINE</b></div><div class="console-title"><h3>Midnight Drive</h3><span>120 BPM &nbsp;/&nbsp; 4/4</span></div><div class="timeline-demo"><div class="measure-numbers"><span>01</span><span>02</span><span>03</span><span>04</span><span>05</span><span>06</span><span>07</span><span>08</span></div><div class="tracks"><div class="track">INTRO</div><div class="track">VERSE</div><div class="track">CHORUS</div></div><div class="event-dots"><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="playhead" id="demo-head"></div></div><div class="console-bottom"><span id="demo-position">BAR 01 / 08</span><button class="demo-play" id="demo-play" aria-pressed="false">▶ Play illustration</button></div></div><span class="figure-label">FIG. 01 &nbsp; A musical map of your MIDI changes. Illustration only; no MIDI or audio is sent.</span>';
-  }
-  function attachDemo() {
-    const button = $("demo-play");
-    if (!button) return;
-    let playing = false, started = 0, elapsed = 0;
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    function frame(time) {
-      if (!playing) return;
-      if (!started) started = time - elapsed;
-      elapsed = (time - started) % 16000;
-      const progress = elapsed / 16000;
-      $("demo-head").style.left = (3 + progress * 94) + "%";
-      $("demo-position").textContent = "BAR " + String(Math.floor(progress * 8) + 1).padStart(2, "0") + " / 08";
-      animation = requestAnimationFrame(frame);
-    }
-    button.addEventListener("click", () => {
-      if (reduced) {
-        elapsed = (elapsed + 2000) % 16000;
-        $("demo-head").style.left = (3 + elapsed / 16000 * 94) + "%";
-        $("demo-position").textContent = "BAR " + String(Math.floor(elapsed / 2000) + 1).padStart(2, "0") + " / 08";
-        button.textContent = "→ Next illustrated bar";
-        return;
-      }
-      playing = !playing;
-      button.setAttribute("aria-pressed", String(playing));
-      button.textContent = playing ? "Ⅱ Pause illustration" : "▶ Play illustration";
-      if (playing) { started = 0; animation = requestAnimationFrame(frame); }
-      else cancelAnimationFrame(animation);
-    });
-  }
+  function hero() { return PetalTimeline.markup(); }
+  function attachDemo() { activeDemo = PetalTimeline.attach(); }
   function render() {
     if (location.hash === "#main" && current) { $("main").focus(); return; }
     const parts = location.hash.slice(1).split("~");
@@ -61,7 +31,8 @@
     closeMenu();
     if (current !== chapter.id) {
       current = chapter.id;
-      cancelAnimationFrame(animation);
+      activeDemo?.destroy();
+      activeDemo = null;
       const index = chapters.indexOf(chapter);
       document.title = chapter.title + " — Petal field guide";
       $("breadcrumb").textContent = chapter.group.toUpperCase() + " / " + String(index + 1).padStart(2, "0");

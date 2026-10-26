@@ -11,6 +11,11 @@ const files = new Map([
   ["/app.js", ["app.js", "text/javascript; charset=utf-8"]],
   ["/content.js", ["content.js", "text/javascript; charset=utf-8"]],
   ["/icon.svg", ["icon.svg", "image/svg+xml"]],
+  ["/timeline.js", ["timeline.js", "text/javascript; charset=utf-8"]],
+  ["/timeline.css", ["timeline.css", "text/css; charset=utf-8"]],
+  ["/assets/play.png", ["assets/play.png", "image/png"]],
+  ["/assets/pause.png", ["assets/pause.png", "image/png"]],
+  ["/assets/stop.png", ["assets/stop.png", "image/png"]],
 ]);
 
 export function createManualServer() {

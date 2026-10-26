@@ -1,0 +1,54 @@
+/* The app timeline uses native point dimensions: 60 pt beats, 2 pt dividers,
+   57 pt headers, 48 pt titles, a 200 pt stationary playhead, and a 48 pt scrubber. */
+.petal-demo{margin:0 0 35px;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif}
+.petal-figure-heading{display:flex;justify-content:space-between;gap:12px;margin-bottom:12px;color:var(--muted);font:9px ui-monospace,monospace;letter-spacing:1.2px}
+.petal-screen{background:#000;color:#fff;border:1px solid #262626;border-radius:16px;overflow:hidden;box-shadow:0 12px 30px #00000012;padding:12px 0 14px}
+.petal-toolbar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:0 17px;min-height:64px}
+.petal-toolbar-left,.petal-toolbar-right{display:flex;align-items:center;gap:4px;min-width:0}
+.petal-toolbar-right{justify-content:flex-end;gap:12px}
+.petal-control,.petal-decoration{display:grid;place-items:center;width:36px;height:44px;flex-shrink:0;border:0;background:transparent;padding:6px;color:#00a1e5}
+.petal-control:hover{opacity:.65}.petal-control:focus-visible{outline:2px solid #00a1e5;outline-offset:-2px;border-radius:6px}
+.petal-icon{display:block;width:26px;height:26px;background:#00a1e5;mask-position:center;mask-size:contain;mask-repeat:no-repeat}
+.petal-icon-play{mask-image:url('assets/play.png')}.petal-icon-pause{mask-image:url('assets/pause.png')}.petal-icon-stop{mask-image:url('assets/stop.png')}
+.petal-song-title{text-align:center;white-space:nowrap;line-height:1.4;min-width:0}
+.petal-song-title strong{font-size:17px;font-weight:700;display:block;color:#fff}
+.petal-song-title i{display:inline-block;width:8px;height:8px;border-radius:50%;background:#14ff00;margin-left:5px}
+.petal-song-title>span{display:block;font-size:17px;font-weight:400;color:#ffffff99;margin-top:4px}
+.petal-toolbar-word{font-size:13px;color:#00a1e5;line-height:1;white-space:nowrap}.petal-toolbar-word:first-child{opacity:.5}
+.petal-stage{position:relative;height:260px;isolation:isolate}
+.petal-viewport{height:100%;width:100%;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;cursor:grab;touch-action:pan-y;overscroll-behavior-x:contain;scroll-behavior:auto!important}
+.petal-viewport::-webkit-scrollbar{display:none}.petal-viewport.is-scrubbing{cursor:grabbing}.petal-world{height:100%;position:relative;user-select:none}
+.petal-song-section{position:absolute;top:43px;height:117px}
+.petal-section-label{position:absolute;top:0;left:0;height:57px;width:max-content;display:flex;align-items:baseline;gap:14px;line-height:1;white-space:nowrap;padding-top:0;color:#fff}
+.petal-section-label strong{font-size:48px;font-weight:700;letter-spacing:-1.2px;line-height:1;color:#fff}
+.petal-section-label>span{font-size:17px;color:#ffffff99;font-weight:400;line-height:1}
+.petal-beat-strip{position:absolute;top:57px;left:0;right:0;height:60px;border-radius:16px;background:repeating-linear-gradient(90deg,transparent 0px,transparent 60px,#0003 60px,#0003 62px),var(--section-color)}
+.petal-event{position:absolute;top:122px;width:16px;height:16px;border-radius:50%;background:#fff;z-index:2}
+.petal-measure{position:absolute;top:159px;width:246px;height:45px;font-size:17px;color:#fff}
+.petal-measure>strong{display:block;font-size:17px;font-weight:700;line-height:1;position:absolute;top:-1px;left:-.5px}
+.petal-measure>div{display:flex;position:absolute;top:24px;left:-.5px;line-height:1}
+.petal-measure span{display:block;width:62px;font-size:17px;font-weight:400;color:#fff}
+.petal-fixed-playhead{position:absolute;pointer-events:none;top:30px;left:calc(50% - 1px);width:2px;height:200px;background:#fff;z-index:5}
+.petal-ripples{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:4}
+.petal-ripple{position:absolute;top:30px;margin-left:-100px;width:200px;height:200px;border-radius:50%;border:1px solid white;opacity:0;animation:petal-ring .58s ease-out forwards}
+@keyframes petal-ring{0%{transform:scale(.05);opacity:0}10%{opacity:.65}100%{transform:scale(1);opacity:0}}
+.petal-scrubber{height:48px;margin:0 59px;display:flex;gap:2px;align-items:center;position:relative}
+.petal-mini-section{position:relative;flex:1;min-width:0;border:0;background:none;padding:0;height:48px}
+.petal-mini-section>span{display:block;height:16px;width:100%;border-radius:4px;background:var(--section-color)}
+.petal-mini-section:hover>span{filter:brightness(1.15)}.petal-mini-section:focus-visible{outline-offset:0;border-radius:4px}
+.petal-mini-playhead{position:absolute;top:0;width:2px;height:48px;background:#fff;pointer-events:none;transform:translateX(-1px)}
+.petal-caption{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;color:var(--muted);font:9px ui-monospace,monospace;letter-spacing:.3px;margin-top:15px;line-height:1.7}
+.petal-demo-help{font-size:11px;color:var(--muted);line-height:1.8;margin:9px 0 0}
+@media(max-width:1150px){.petal-toolbar-word{display:none}.petal-toolbar-right{gap:4px}}
+@media(max-width:760px){.petal-toolbar{padding:0 10px;gap:0}.petal-song-title strong,.petal-song-title>span{font-size:13px}.petal-settings,.petal-toolbar-left>.petal-decoration{display:none}.petal-toolbar-right{gap:0}.petal-control,.petal-decoration{width:30px}.petal-icon{width:23px;height:23px}.petal-figure-heading{font-size:8px}.petal-figure-heading span:last-child{max-width:120px;text-align:right}.petal-scrubber{margin:0 30px}.petal-stage{height:260px}.petal-caption{font-size:8px}}
+@media(prefers-reduced-motion:reduce){.petal-ripple{display:none}}
+@media print{.petal-screen{print-color-adjust:exact;-webkit-print-color-adjust:exact}.petal-demo-help{display:none}}
+
+/* Only functional illustration controls are shown. Keep the song title centered. */
+.petal-toolbar-left{gap:8px}
+.petal-toolbar-balance{min-width:0}
+
+/* Animation is a constant-speed compositor transform, never a native smooth scroll. */
+.petal-viewport{overflow-x:hidden}
+.petal-world{will-change:transform;transition:none!important;animation:none!important}
+.petal-section-label,.petal-mini-playhead{transition:none!important}
