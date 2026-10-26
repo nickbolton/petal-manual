@@ -79,8 +79,10 @@ locally without sending MIDI. Reduced-motion mode advances one bar per click.
 
 Playback uses transform-only Web Animations on the browser compositor, with one
 shared animation origin for the timeline, sticky headers, and overview marker.
-The JavaScript frame loop only updates captions and reports occasional events;
-it does not perform geometry reads or write motion styles during playback.
+There is no JavaScript playback frame loop. Headers animate in a separate overlay,
+and a fixed pool of 12 ripple elements is scheduled on the same animation clock.
+The caption updates once per bar. Playback does not allocate event DOM nodes or
+perform per-frame geometry reads or motion-style writes.
 Motion stays linear and does not snap to beats. Only Play/Pause, Stop, and the section overview are presented as
 buttons; ornamental navigation and settings controls are omitted.
 

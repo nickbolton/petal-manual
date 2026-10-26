@@ -1,6 +1,6 @@
 import React from "react";
 import { useEffect, useRef } from "react";
-import { attach, sections, events, beatWidth } from "./controller";
+import { attach, sections, events, beatWidth, rippleLimit } from "./controller";
 
 export function Timeline() {
   const root = useRef<HTMLElement>(null);
@@ -18,13 +18,14 @@ export function Timeline() {
       </div><div className="petal-song-title"><strong>Midnight Drive <i aria-hidden="true"/></strong><span>4/4 Time • 120 bpm</span></div><div className="petal-toolbar-balance" aria-hidden="true"/></div>
       <div className="petal-stage"><div id="demo-viewport" className="petal-viewport" tabIndex={0} role="region" aria-label="Song timeline. Scroll horizontally or use left and right arrows to scrub.">
         <div id="demo-world" className="petal-world">
-          {sections.map(section => <div key={section.name} className="petal-song-section" data-world-beat={section.start} style={{width:section.beats * beatWidth - 2, "--section-color":section.color} as React.CSSProperties}>
-            <div className="petal-section-label"><strong>{section.name}</strong><span>4.0</span></div><div className="petal-beat-strip"/>
+          {sections.map(section => <div key={section.name} className="petal-song-section" role="group" aria-label={section.name} data-world-beat={section.start} style={{width:section.beats * beatWidth - 2, "--section-color":section.color} as React.CSSProperties}>
+            <div className="petal-beat-strip"/>
           </div>)}
           {Array.from({length:12}, (_,i) => <div key={i} className="petal-measure" data-world-beat={i * 4}><strong>{i+1}</strong><div>{[1,2,3,4].map(beat => <span key={beat}>{beat}</span>)}</div></div>)}
           {events.map(beat => <span key={beat} className="petal-event" data-world-beat={beat} data-inset={8}/>)}
         </div>
-      </div><div id="demo-ripples" className="petal-ripples" aria-hidden="true"/><div className="petal-fixed-playhead" aria-hidden="true"/></div>
+      </div><div className="petal-headers" aria-hidden="true">{sections.map(section => <div key={section.name} className="petal-section-label"><strong>{section.name}</strong><span>4.0</span></div>)}</div>
+      <div id="demo-ripples" className="petal-ripples" aria-hidden="true">{Array.from({length:rippleLimit},(_,index) => <span className="petal-ripple-carrier" key={index}><span className="petal-ripple"/></span>)}</div><div className="petal-fixed-playhead" aria-hidden="true"/></div>
       <div className="petal-scrubber" role="group" aria-label="Jump to a song section">
         {sections.map(section => <button key={section.name} className="petal-mini-section" data-beat={section.start} aria-label={"Jump to " + section.name} style={{"--section-color":section.color} as React.CSSProperties}><span/></button>)}
         {events.map(beat => <span key={beat} className="petal-mini-event" data-beat={beat} aria-hidden="true"/>)}
