@@ -5,3 +5,12 @@
 @media(max-width:760px){:root{--header:70px}.topbar{padding:0 20px;gap:12px}.brand{min-width:0;font-size:27px;gap:8px}.brand svg{width:25px;height:25px}.edition{display:none}.top-actions{gap:8px}.search-trigger{padding:8px;border:none}.search-trigger span,.search-trigger kbd{display:none}.menu-toggle{display:grid}.layout{display:block}.sidebar{position:fixed;left:0;top:var(--header);width:270px;background:var(--paper);z-index:25;transform:translateX(-100%);transition:transform .2s}.menu-open .sidebar{transform:translateX(0)}.menu-open .mobile-shade{display:block;position:fixed;inset:var(--header) 0 0;background:#0007;z-index:20}main{padding:0 23px}.reading-progress{margin:0 -23px}.page-meta{font-size:8px;padding-top:21px}.chapter-head{padding:35px 0 28px}h1{font-size:45px;letter-spacing:-2px}.lede{font-size:15px}.hero-console{padding:20px 17px}.console-title h3{font-size:22px}.console-title span{font-size:8px}.feature-grid{gap:10px}.feature-card{padding:16px}.feature-card p{font-size:11px}.section{padding-top:24px}h2{font-size:23px}.section p,.section li{font-size:13px}.footer{font-size:8px}.footer>span:last-child{width:100%}.chapter-pagination a{padding:13px}.chapter-pagination strong{font-size:12px}.chapter-pagination small{font-size:8px}.figure-label{font-size:8px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
 @media print{.topbar,.sidebar,.toc,.page-meta,.reading-progress,.chapter-pagination,.demo-play,.footer,.mobile-shade,dialog{display:none!important}.layout{display:block}main{padding:0;max-width:none}body{background:#fff;color:#000;font-size:11pt}.chapter-head{padding:0 0 20px}h1{font-size:34pt}.section{break-inside:avoid}.hero-console{print-color-adjust:exact}.section p,.section li{color:#333}a{text-decoration:none}.feature-grid{break-inside:avoid}}
+
+/* Center header icons geometrically instead of relying on font-glyph baselines. */
+.topbar .icon-button{padding:0;line-height:1;flex-shrink:0}
+.topbar .icon-button svg{width:24px;height:24px}
+@media(max-width:760px){
+  .topbar .brand{line-height:1}
+  .top-actions .search-trigger,.top-actions .icon-button{display:grid;place-items:center;width:36px;height:36px;padding:0;line-height:1;flex-shrink:0}
+  .top-actions .search-trigger svg{width:20px;height:20px}
+}
