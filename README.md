@@ -1,44 +1,69 @@
 # Petal user manual
 
-A dependency-free, responsive HTML manual for the Petal iOS app.
+A React + TypeScript field guide for the Petal iOS app, built with React Router
+framework mode and Vite. All 12 chapters are pre-rendered at build time; navigation
+and search run in the browser. The existing design and iOS-style timeline are preserved.
 
-- Open dist/index.html directly, or serve dist with any static HTTP server.
-- Chapter content lives in dist/content.js; presentation in style.css; navigation and search in app.js.
-- All illustrations are illustrative interface diagrams, not screenshots.
-- Search, chapter links, print, theme selection, mobile navigation, and the timeline demo run locally.
-- Content was checked against the local Petal iOS and esp32-petal source in October 2026.
-- This guide describes the current development app. Keep it in step with releases.
+## Development
 
-## Heroku
-
-Live app: https://petal-user-manual-b5af91119565.herokuapp.com/
-
-The standalone Git repository deploys directly to the Heroku remote. The app runs
-on the heroku-24 stack using Node 24 LTS, with no runtime npm dependencies or add-ons.
+Use Node 24 LTS, matching Heroku's runtime.
 
 ```sh
-npm test
+npm ci --include=dev
+npm run dev
+```
+
+Development: http://127.0.0.1:5173. Production preview:
+
+```sh
 npm run check
+npm run build
+npm test
 npm start
 ```
 
-Local server: http://localhost:3000 (or set PORT).
+The production server listens on http://localhost:3000 (or PORT). Build before
+running tests, which verify the generated chapter pages as well as React behavior.
 
-Deploy committed changes:
+## Source
+
+- `app/content.ts`: typed chapter content; authored HTML is trusted repository content.
+- `app/components/`: manual layout, chapter navigation, search, and persistent theme.
+- `app/timeline/`: React markup and the typed animation/gesture controller.
+- `app/routes/`: clean chapter URLs and not-found UI.
+- `app/style.css`, `app/timeline.css`: retained visual styling.
+- `public/`: transport icon assets, favicon, and static 404 page.
+- `server.mjs`: production static server and health endpoint.
+
+The overview is `/`; other chapters use `/<chapter-id>`. Sections use standard
+fragment identifiers. There are no legacy hash-route redirects. Generated output
+in `build/` and React Router type output are ignored by Git.
+
+Dark/light mode is remembered in localStorage under `petal-manual-theme` and
+restored before paint. The root provider persists across chapter navigation.
+
+## GitHub and Heroku
+
+Source: https://github.com/nickbolton/petal-manual
+
+Live: https://petal-user-manual-b5af91119565.herokuapp.com/
+
+`main` tracks `origin/main`; `heroku` remains a separate deployment remote.
 
 ```sh
-git push heroku HEAD:main
-heroku ps --app petal-user-manual
+git push origin main
+git push heroku main
 ```
 
-The Basic web dyno is billed by Heroku (up to $7/month). To stop serving:
+Heroku installs the build dependencies, runs `heroku-postbuild` to pre-render the
+manual, then serves `build/client` using Node 24. The Basic dyno remains on the
+existing app (up to $7/month); no additional services or add-ons are required.
+Only generated pages, public assets, and `/healthz` are exposed. Unknown URLs
+return HTTP 404. Inline React/theme bootstrapping scripts are authorized by exact
+CSP hashes; arbitrary inline JavaScript remains blocked.
 
-```sh
-heroku ps:scale web=0 --app petal-user-manual
-```
-
-Only dist assets and /healthz are exposed by the server. Source, configuration,
-and tests cannot be requested over HTTP. No account data or credentials are included.
+Content reflects the local Petal iOS and esp32-petal source reviewed in October
+2026. Illustrations are interface diagrams, not screenshots or live MIDI controls.
 
 ## Timeline illustration
 

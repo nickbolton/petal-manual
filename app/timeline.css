@@ -9,7 +9,7 @@
 .petal-control,.petal-decoration{display:grid;place-items:center;width:36px;height:44px;flex-shrink:0;border:0;background:transparent;padding:6px;color:#00a1e5}
 .petal-control:hover{opacity:.65}.petal-control:focus-visible{outline:2px solid #00a1e5;outline-offset:-2px;border-radius:6px}
 .petal-icon{display:block;width:26px;height:26px;background:#00a1e5;mask-position:center;mask-size:contain;mask-repeat:no-repeat}
-.petal-icon-play{mask-image:url('assets/play.png')}.petal-icon-pause{mask-image:url('assets/pause.png')}.petal-icon-stop{mask-image:url('assets/stop.png')}
+.petal-icon-play{mask-image:url('/assets/play.png')}.petal-icon-pause{mask-image:url('/assets/pause.png')}.petal-icon-stop{mask-image:url('/assets/stop.png')}
 .petal-song-title{text-align:center;white-space:nowrap;line-height:1.4;min-width:0}
 .petal-song-title strong{font-size:17px;font-weight:700;display:block;color:#fff}
 .petal-song-title i{display:inline-block;width:8px;height:8px;border-radius:50%;background:#14ff00;margin-left:5px}

@@ -1,4 +1,7 @@
-const chapters = [
+export interface ChapterSection { id: string; title: string; html: string }
+export interface Chapter { id: string; title: string; group: string; kicker: string; headline: string; intro: string; tags: string[]; sections: ChapterSection[] }
+export const chapterPath = (id: string) => id === "overview" ? "/" : "/" + id;
+export const chapters: Chapter[] = [
   {
     "id": "overview",
     "title": "Meet Petal",
@@ -20,12 +23,12 @@ const chapters = [
       {
         "id": "four-tabs",
         "title": "Four tabs. One connected rig.",
-        "html": "<div class=\"feature-grid\"><a class=\"feature-card\" href=\"#songs\"><div class=\"card-top\"><span class=\"card-icon\">♫</span><span class=\"arrow\">↗</span></div><h3>Songs</h3><p>Your library of songs, musical structure, and timed changes.</p></a><a class=\"feature-card\" href=\"#performances\"><div class=\"card-top\"><span class=\"card-icon\">☷</span><span class=\"arrow\">↗</span></div><h3>Performances</h3><p>Arrange your songs into the order the night calls for.</p></a><a class=\"feature-card\" href=\"#devices\"><div class=\"card-top\"><span class=\"card-icon\">▣</span><span class=\"arrow\">↗</span></div><h3>Devices</h3><p>Set up your gear, MIDI channels, colors, controls, and presets.</p></a><a class=\"feature-card\" href=\"#patches\"><div class=\"card-top\"><span class=\"card-icon\">≋</span><span class=\"arrow\">↗</span></div><h3>Patches</h3><p>Bundle presets into reusable changes across your rig.</p></a></div>"
+        "html": "<div class=\"feature-grid\"><a class=\"feature-card\" href=\"/songs\"><div class=\"card-top\"><span class=\"card-icon\">♫</span><span class=\"arrow\">↗</span></div><h3>Songs</h3><p>Your library of songs, musical structure, and timed changes.</p></a><a class=\"feature-card\" href=\"/performances\"><div class=\"card-top\"><span class=\"card-icon\">☷</span><span class=\"arrow\">↗</span></div><h3>Performances</h3><p>Arrange your songs into the order the night calls for.</p></a><a class=\"feature-card\" href=\"/devices\"><div class=\"card-top\"><span class=\"card-icon\">▣</span><span class=\"arrow\">↗</span></div><h3>Devices</h3><p>Set up your gear, MIDI channels, colors, controls, and presets.</p></a><a class=\"feature-card\" href=\"/patches\"><div class=\"card-top\"><span class=\"card-icon\">≋</span><span class=\"arrow\">↗</span></div><h3>Patches</h3><p>Bundle presets into reusable changes across your rig.</p></a></div>"
       },
       {
         "id": "choose-a-path",
         "title": "Find your starting point.",
-        "html": "<p>New rig? Follow <a href=\"#quick-start\">Your first performance</a>. Already have sounds saved? Jump to <a href=\"#timeline\">the timeline</a>. At rehearsal with something not responding? Open <a href=\"#troubleshooting\">Troubleshooting</a>.</p><div class=\"note\"><strong>About this guide</strong><p>This manual follows the current development version of Petal, reviewed in October 2026. Interface diagrams are illustrations; labels and behavior can change between app and firmware releases.</p></div>"
+        "html": "<p>New rig? Follow <a href=\"/quick-start\">Your first performance</a>. Already have sounds saved? Jump to <a href=\"/timeline\">the timeline</a>. At rehearsal with something not responding? Open <a href=\"/troubleshooting\">Troubleshooting</a>.</p><div class=\"note\"><strong>About this guide</strong><p>This manual follows the current development version of Petal, reviewed in October 2026. Interface diagrams are illustrations; labels and behavior can change between app and firmware releases.</p></div>"
       }
     ]
   },
@@ -54,7 +57,7 @@ const chapters = [
       {
         "id": "next-step",
         "title": "Build up in layers.",
-        "html": "<p>Once one cue works, add a second device or create a <a href=\"#patches\">patch</a> that combines several presets. Then add timed changes, ramps, and the rest of your performance order. Save and rehearse each layer before moving on.</p>"
+        "html": "<p>Once one cue works, add a second device or create a <a href=\"/patches\">patch</a> that combines several presets. Then add timed changes, ramps, and the rest of your performance order. Save and rehearse each layer before moving on.</p>"
       }
     ]
   },
@@ -83,7 +86,7 @@ const chapters = [
       {
         "id": "midi-path",
         "title": "Separate the two MIDI channels.",
-        "html": "<p>Your rig has two different channel choices. A <strong>device’s MIDI channel</strong> targets the gear receiving its preset messages. Petal’s <strong>Incoming MIDI channel</strong> is for external performance commands arriving at the controller.</p><div class=\"flow\"><span>External controller</span><b>→</b><span>Petal incoming channel</span><b>→</b><span>Song playback</span></div><div class=\"flow\"><span>Song event</span><b>→</b><span>Device’s MIDI channel</span><b>→</b><span>Your gear</span></div><p>Changing one does not automatically change the other. See the <a href=\"#midi\">MIDI reference</a> for performance command values.</p>"
+        "html": "<p>Your rig has two different channel choices. A <strong>device’s MIDI channel</strong> targets the gear receiving its preset messages. Petal’s <strong>Incoming MIDI channel</strong> is for external performance commands arriving at the controller.</p><div class=\"flow\"><span>External controller</span><b>→</b><span>Petal incoming channel</span><b>→</b><span>Song playback</span></div><div class=\"flow\"><span>Song event</span><b>→</b><span>Device’s MIDI channel</span><b>→</b><span>Your gear</span></div><p>Changing one does not automatically change the other. See the <a href=\"/midi\">MIDI reference</a> for performance command values.</p>"
       },
       {
         "id": "transport-changes",
