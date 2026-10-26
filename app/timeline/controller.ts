@@ -299,8 +299,9 @@ export function attach(root: HTMLElement) {
   }, {passive:false});
   listen(viewport, "pointerdown", event => {
     if (event.isPrimary === false || event.button !== 0 || pageIsScrolling()) return;
-    // Do not pause or capture until a deliberate horizontal drag is established.
+    // Pause immediately on press; capture only after horizontal drag intent.
     const scroll = visualScroll === null ? currentBeat() * beatWidth : rubberBandOrigin(visualScroll, previousWidth);
+    if (playing) pause();
     // Catch existing momentum without snapping its currently rendered position.
     cancelAnimationFrame(coastID);
     coastID = 0;
@@ -313,7 +314,6 @@ export function attach(root: HTMLElement) {
     if (!pointer.dragging) {
       if (pageIsScrolling() || (Math.abs(dy) > 6 && Math.abs(dy) >= Math.abs(dx))) { endDrag(); return; }
       if (Math.abs(dx) <= 6 || Math.abs(dx) <= Math.abs(dy)) return;
-      pause();
       pointer.dragging = true;
       viewport.focus({preventScroll:true});
       document.getSelection?.()?.removeAllRanges();

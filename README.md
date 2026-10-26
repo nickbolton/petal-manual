@@ -233,7 +233,9 @@ The sample events follow a fixed sparse pattern. Section entries fire a random
 and respects manual pause. Reduced Motion disables autoplay and uses manual
 bar-by-bar stepping instead. Vertical page scrolling and its momentum do not
 scrub or pause playback; timeline and overview drags start only after clear
-horizontal movement. No MIDI or audio is sent.
+horizontal movement. Pressing the timeline pauses playback immediately on both
+touchscreens and desktop, unless vertical page scrolling is already active.
+No MIDI or audio is sent.
 
 ## Troubleshooting
 

@@ -257,7 +257,7 @@ test("React Strict Mode remounts without duplicate timeline handlers; gestures a
     // Vertical wheel gestures can begin outside the illustration, then drift
     // diagonally over it during momentum without seeking or cancelling playback.
     play.click();
-    const playingAnimationCount=animations.length;
+    let playingAnimationCount=animations.length;
     const playingPosition=windows.document.getElementById("demo-position")!.textContent;
     const wheel=(target:EventTarget,x:number,y:number,options:WheelEventInit={})=>{
       const event=new windows.WheelEvent("wheel",{bubbles:true,cancelable:true,deltaX:x,deltaY:y,...options});target.dispatchEvent(event);return event;
@@ -269,11 +269,19 @@ test("React Strict Mode remounts without duplicate timeline handlers; gestures a
     pointer(viewport,"pointerdown",100,110);pointer(viewport,"pointermove",160,130);
     assert.equal(play.getAttribute("aria-pressed"),"true");
     assert.equal(windows.document.body.classList.contains("petal-timeline-dragging"),false);
-    // Once scrolling settles, a vertical finger gesture over either surface
-    // still belongs to the page; a pointer down alone never pauses playback.
+    // Once page scrolling settles, both a mouse press and touch-down pause
+    // immediately, without waiting for a drag. Vertical motion remains native.
     clock+=250;
-    pointer(viewport,"pointerdown",100,140);pointer(viewport,"pointermove",102,160,180);
-    assert.equal(play.getAttribute("aria-pressed"),"true");
+    pointer(viewport,"pointerdown",100,140);
+    assert.equal(play.getAttribute("aria-pressed"),"false");
+    pointer(viewport,"pointerup",100,145);
+    play.click();
+    pointer(viewport,"pointerdown",100,150,100,{pointerType:"touch"});
+    assert.equal(play.getAttribute("aria-pressed"),"false");
+    pointer(viewport,"pointermove",102,160,180,{pointerType:"touch"});
+    assert.equal(windows.document.body.classList.contains("petal-timeline-dragging"),false);
+    play.click();
+    playingAnimationCount=animations.length;
     windows.dispatchEvent(new windows.Event("scroll"));
     pointer(mini,"pointerdown",100,170);pointer(mini,"pointermove",102,190,180);
     assert.equal(play.getAttribute("aria-pressed"),"true");
