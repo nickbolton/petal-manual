@@ -60,3 +60,15 @@
 .petal-mini-playhead{left:0}
 .petal-ripple-carrier{position:absolute;top:30px;left:0;margin-left:-100px;width:200px;height:200px;will-change:transform;pointer-events:none}
 .petal-ripple-carrier>.petal-ripple{top:0;left:0;margin:0;will-change:transform,opacity}
+
+/* SongScrubberView: 4 pt white circles centered in the 48 pt hit area.
+   Geometry is half-point-aligned in JS, using the app's two-point section gaps. */
+.petal-scrubber{display:block}
+.petal-mini-section{position:absolute;top:0}
+.petal-mini-event{position:absolute;top:calc(50% - 2px);width:4px;height:4px;border-radius:2px;background:#fff;pointer-events:none;z-index:1}
+.petal-mini-event.is-disabled{background:#484848}
+.petal-mini-playhead{z-index:2}
+/* Safari needs the prefixed property. Suppress selection outside the timeline
+   only while pointer capture is active; normal manual text remains selectable. */
+.petal-viewport,.petal-viewport *{-webkit-user-select:none;user-select:none;-webkit-user-drag:none;-webkit-touch-callout:none}
+body.petal-timeline-dragging,body.petal-timeline-dragging *{-webkit-user-select:none!important;user-select:none!important;cursor:grabbing!important}

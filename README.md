@@ -68,3 +68,8 @@ Timeline section corners use the app's 16-point radius; scrubber segments use
 4 points. Both beat and measure labels sit below the colored strip. Light beat
 numbers occupy the upper row; bold measure numbers occupy the lower row, matching
 SongMeasureCell's 45-point marker area.
+
+Scrubber events use 4-point white circles, centered vertically, with the iOS
+half-point placement formula. The scrubber's playhead and section widths share
+the same native beat scale. Safari text selection is suppressed during timeline
+drags and restored on pointer release, cancellation, lost capture, or teardown.

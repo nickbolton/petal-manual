@@ -15,11 +15,20 @@ const PetalTimeline = (() => {
     const clamped = Math.max(0, Math.min(totalBeats, beat));
     return { beat: clamped, scrollLeft: clamped * beatWidth, bar: Math.min(12, Math.floor(clamped / 4) + 1), section: sections.findLast(s => clamped >= s.start).name };
   }
+  function scrubberBeatWidth(width) {
+    return Math.max(0, width - (sections.length - 1) * 2) / totalBeats;
+  }
+  function scrubberEventX(beat, width) {
+    return Math.round((beat * scrubberBeatWidth(width) - 3) * 2) / 2;
+  }
+  function scrubberHeadX(beat, width) {
+    return Math.max(0, position(beat).beat * scrubberBeatWidth(width) - 2);
+  }
   function icon(name, extra = "") {
     return '<span class="petal-icon petal-icon-' + name + ' ' + extra + '" aria-hidden="true"></span>';
   }
   function markup() {
-    return '<figure class="petal-demo"><div class="petal-figure-heading"><span>A SONG IN MOTION</span><span>INTERACTIVE APP ILLUSTRATION</span></div><div class="petal-screen"><div class="petal-toolbar"><div class="petal-toolbar-left"><button id="demo-play" class="petal-control" aria-label="Play illustration" aria-pressed="false">' + icon("play") + '</button><button id="demo-stop" class="petal-control" aria-label="Stop and rewind illustration">' + icon("stop") + '</button></div><div class="petal-song-title"><strong>Midnight Drive <i aria-hidden="true"></i></strong><span>4/4 Time • 120 bpm</span></div><div class="petal-toolbar-balance" aria-hidden="true"></div></div><div class="petal-stage"><div id="demo-viewport" class="petal-viewport" tabindex="0" role="region" aria-label="Song timeline. Scroll horizontally or use left and right arrows to scrub."><div id="demo-world" class="petal-world"></div></div><div id="demo-ripples" class="petal-ripples" aria-hidden="true"></div><div class="petal-fixed-playhead" aria-hidden="true"></div></div><div class="petal-scrubber" role="group" aria-label="Jump to a song section">' + sections.map(s => '<button class="petal-mini-section" data-beat="' + s.start + '" aria-label="Jump to ' + s.name + '" style="--section-color:' + s.color + '"><span></span></button>').join("") + '<span id="demo-mini-head" class="petal-mini-playhead" aria-hidden="true"></span></div></div><figcaption class="petal-caption"><span>FIG. 01 &nbsp; The playhead stays still. Your song moves.</span><span id="demo-position">Intro · Bar 1 of 12</span></figcaption><p class="petal-demo-help">The illustration plays when it comes into view. Pause it, drag the timeline, or tap a section in the overview. Section titles stick at the leading edge until the next section takes over. Illustration only; no MIDI or audio is sent.</p></figure>';
+    return '<figure class="petal-demo"><div class="petal-figure-heading"><span>A SONG IN MOTION</span><span>INTERACTIVE APP ILLUSTRATION</span></div><div class="petal-screen"><div class="petal-toolbar"><div class="petal-toolbar-left"><button id="demo-play" class="petal-control" aria-label="Play illustration" aria-pressed="false">' + icon("play") + '</button><button id="demo-stop" class="petal-control" aria-label="Stop and rewind illustration">' + icon("stop") + '</button></div><div class="petal-song-title"><strong>Midnight Drive <i aria-hidden="true"></i></strong><span>4/4 Time • 120 bpm</span></div><div class="petal-toolbar-balance" aria-hidden="true"></div></div><div class="petal-stage"><div id="demo-viewport" class="petal-viewport" tabindex="0" role="region" aria-label="Song timeline. Scroll horizontally or use left and right arrows to scrub."><div id="demo-world" class="petal-world"></div></div><div id="demo-ripples" class="petal-ripples" aria-hidden="true"></div><div class="petal-fixed-playhead" aria-hidden="true"></div></div><div class="petal-scrubber" role="group" aria-label="Jump to a song section">' + sections.map(s => '<button class="petal-mini-section" data-beat="' + s.start + '" aria-label="Jump to ' + s.name + '" style="--section-color:' + s.color + '"><span></span></button>').join("") + events.map(b => '<span class="petal-mini-event" data-beat="' + b + '" aria-hidden="true"></span>').join("") + '<span id="demo-mini-head" class="petal-mini-playhead" aria-hidden="true"></span></div></div><figcaption class="petal-caption"><span>FIG. 01 &nbsp; The playhead stays still. Your song moves.</span><span id="demo-position">Intro · Bar 1 of 12</span></figcaption><p class="petal-demo-help">The illustration plays when it comes into view. Pause it, drag the timeline, or tap a section in the overview. Section titles stick at the leading edge until the next section takes over. Illustration only; no MIDI or audio is sent.</p></figure>';
   }
   function motionPlan(fromBeat, viewportWidth, labelWidths, scrubberWidth) {
     const start = position(fromBeat).scrollLeft;
@@ -38,11 +47,15 @@ const PetalTimeline = (() => {
         transform: translation(stickyOffset(offset, viewportWidth, sectionStart, sectionWidth, labelWidth)),
       }));
     });
+    const miniStart = position(fromBeat).beat;
+    const miniThreshold = 2 / scrubberBeatWidth(scrubberWidth);
+    const miniStops = [miniStart, miniThreshold, totalBeats].filter((value, index, values) =>
+      value >= miniStart && value <= totalBeats && values.indexOf(value) === index).sort((a,b) => a-b);
     return {
       duration: (totalBeats - position(fromBeat).beat) * 500,
       world: [{transform:translation(-start)}, {transform:translation(-end)}],
       labels: labelFrames,
-      mini: [{transform:translation(position(fromBeat).beat / totalBeats * scrubberWidth - 1)}, {transform:translation(scrubberWidth - 1)}],
+      mini: miniStops.map(value => ({offset:(value - miniStart) / (totalBeats - miniStart || 1), transform:translation(scrubberHeadX(value, scrubberWidth))})),
     };
   }
   function attach() {
@@ -77,7 +90,7 @@ const PetalTimeline = (() => {
         const offset = stickyOffset(p.scrollLeft, previousWidth, s.start * beatWidth, s.beats * beatWidth - 2, labelWidths[index]);
         label.style.transform = "translate3d(" + offset + "px,0,0)";
       });
-      mini.style.transform = "translate3d(" + (p.beat / totalBeats * scrubberWidth - 1) + "px,0,0)";
+      mini.style.transform = "translate3d(" + scrubberHeadX(p.beat, scrubberWidth) + "px,0,0)";
       metadata();
     }
     function cancelMotion() {
@@ -170,6 +183,14 @@ const PetalTimeline = (() => {
       world.innerHTML = sections.map(s => '<div class="petal-song-section" style="left:' + (width / 2 + s.start * beatWidth) + 'px;width:' + (s.beats * beatWidth - 2) + 'px;--section-color:' + s.color + '"><div class="petal-section-label"><strong>' + s.name + '</strong><span>4.0</span></div><div class="petal-beat-strip"></div></div>').join("") + Array.from({length:12}, (_, i) => '<div class="petal-measure" style="left:' + (width / 2 + i * 4 * beatWidth) + 'px"><strong>' + (i + 1) + '</strong><div><span>1</span><span>2</span><span>3</span><span>4</span></div></div>').join("") + events.map(b => '<span class="petal-event" style="left:' + (width / 2 + b * beatWidth - 8) + 'px"></span>').join("");
       labels = Array.from(world.querySelectorAll(".petal-section-label"));
       labelWidths = labels.map(label => label.offsetWidth);
+      const overviewBeatWidth = scrubberBeatWidth(scrubberWidth);
+      scrubber.querySelectorAll(".petal-mini-section").forEach((button, index) => {
+        button.style.left = (sections[index].start * overviewBeatWidth) + "px";
+        button.style.width = Math.max(0, sections[index].beats * overviewBeatWidth - 2) + "px";
+      });
+      scrubber.querySelectorAll(".petal-mini-event").forEach(dot => {
+        dot.style.left = scrubberEventX(Number(dot.dataset.beat), scrubberWidth) + "px";
+      });
       update();
       if (wasPlaying) start();
     }
@@ -187,6 +208,10 @@ const PetalTimeline = (() => {
     }, {passive:false});
     viewport.addEventListener("pointerdown", event => {
       if (event.button !== 0) return;
+      event.preventDefault();
+      viewport.focus({preventScroll:true});
+      document.getSelection?.()?.removeAllRanges();
+      document.body.classList.add("petal-timeline-dragging");
       pause();
       pointer = {id:event.pointerId, x:event.clientX, scroll:beat * beatWidth};
       viewport.setPointerCapture(event.pointerId);
@@ -196,7 +221,15 @@ const PetalTimeline = (() => {
       if (!pointer || event.pointerId !== pointer.id) return;
       seek((pointer.scroll - (event.clientX - pointer.x)) / beatWidth);
     });
-    const endDrag = () => { pointer = null; viewport.classList.remove("is-scrubbing"); };
+    const endDrag = () => {
+      pointer = null;
+      viewport.classList.remove("is-scrubbing");
+      document.body.classList.remove("petal-timeline-dragging");
+    };
+    const preventSelection = event => { if (pointer) event.preventDefault(); };
+    document.addEventListener("selectstart", preventSelection);
+    viewport.addEventListener("dragstart", event => event.preventDefault());
+    viewport.addEventListener("lostpointercapture", endDrag);
     viewport.addEventListener("pointerup", endDrag);
     viewport.addEventListener("pointercancel", endDrag);
     viewport.addEventListener("keydown", event => {
@@ -230,7 +263,12 @@ const PetalTimeline = (() => {
     }, {threshold:[0, .15]});
     visibility.observe(viewport.closest(".petal-screen"));
     updateButton();
-    return {destroy() { destroyed = true; cancelMotion(); resize.disconnect(); visibility.disconnect(); }};
+    return {destroy() {
+      destroyed = true;
+      endDrag();
+      document.removeEventListener("selectstart", preventSelection);
+      cancelMotion(); resize.disconnect(); visibility.disconnect();
+    }};
   }
-  return {markup, attach, stickyOffset, position, motionPlan};
+  return {markup, attach, stickyOffset, position, motionPlan, scrubberEventX, scrubberHeadX};
 })();

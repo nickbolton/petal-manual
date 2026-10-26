@@ -123,10 +123,13 @@ test("appearance starts playback, preserves manual pause, and cleans up observer
     const elements = new Map();
     const createdAnimations = [];
     let visibility;
+    const documentHandlers = new Map();
     function element() {
+      const classes = new Set();
       return {
         style:{}, clientWidth:640, offsetWidth:140, textContent:"", innerHTML:"", attributes:{}, handlers:{},
-        classList:{add(){},remove(){}}, childElementCount:0,
+        classList:{add(value){classes.add(value);},remove(value){classes.delete(value);},contains(value){return classes.has(value);}}, childElementCount:0,
+        querySelectorAll(){return [];}, focus(){}, setPointerCapture(){},
         addEventListener(name, handler) { this.handlers[name] = handler; },
         setAttribute(name,value) { this.attributes[name] = value; },
         replaceChildren(){}, closest() { return this; },
@@ -139,8 +142,11 @@ test("appearance starts playback, preserves manual pause, and cleans up observer
     for (const id of ["demo-viewport","demo-world","demo-play","demo-stop","demo-mini-head","demo-position","demo-ripples"]) elements.set(id,element());
     elements.get("demo-mini-head").parentElement = element();
     elements.get("demo-world").querySelectorAll = () => [element(),element(),element()];
+    const body = element();
     const context = vm.createContext({
-      document:{getElementById:id=>elements.get(id),querySelectorAll:()=>[],timeline:{currentTime:100},fonts:{ready:Promise.resolve()}},
+      document:{body,getElementById:id=>elements.get(id),querySelectorAll:()=>[],timeline:{currentTime:100},fonts:{ready:Promise.resolve()},
+        addEventListener(name,handler){documentHandlers.set(name,handler);},
+        removeEventListener(name){documentHandlers.delete(name);}},
       matchMedia:()=>({matches:reduceMotion}),requestAnimationFrame:()=>1,cancelAnimationFrame(){},
       ResizeObserver:class{observe(){} disconnect(){}},
       IntersectionObserver:class{
@@ -170,10 +176,39 @@ test("appearance starts playback, preserves manual pause, and cleans up observer
       play.handlers.click();
       assert.ok(elements.get("demo-position").textContent.includes("Bar 2"));
     }
+    const viewport = elements.get("demo-viewport");
+    const pointerDown = () => viewport.handlers.pointerdown({button:0,pointerId:1,clientX:200,preventDefault(){}});
+    pointerDown();
+    assert.equal(body.classList.contains("petal-timeline-dragging"),true);
+    let selectionPrevented = false;
+    documentHandlers.get("selectstart")({preventDefault(){selectionPrevented=true;}});
+    assert.equal(selectionPrevented,true);
+    viewport.handlers.pointercancel();
+    assert.equal(body.classList.contains("petal-timeline-dragging"),false);
+    pointerDown();
+    viewport.handlers.lostpointercapture();
+    assert.equal(body.classList.contains("petal-timeline-dragging"),false);
+    pointerDown();
     controller.destroy();
+    assert.equal(body.classList.contains("petal-timeline-dragging"),false);
+    assert.equal(documentHandlers.has("selectstart"),false);
     assert.equal(visibility.disconnected,true);
     const count = createdAnimations.length;
     show();
     assert.equal(createdAnimations.length,count);
+  }
+});
+
+
+test("scrubber event dots use native half-point positions and align with its playhead", async () => {
+  const source = await readFile(new URL("../dist/timeline.js", import.meta.url), "utf8");
+  const timeline = vm.runInContext(source + "\nPetalTimeline", vm.createContext({}));
+  assert.equal([...timeline.markup().matchAll(/class="petal-mini-event"/g)].length,12);
+  for (const width of [280,520,640]) {
+    const unit = (width - 4) / 48;
+    for (const beat of [0,4,16,32,44]) {
+      assert.equal(timeline.scrubberEventX(beat,width), Math.round((beat * unit - 3) * 2) / 2);
+      assert.equal(timeline.scrubberHeadX(beat,width), Math.max(0,beat * unit - 2));
+    }
   }
 });
