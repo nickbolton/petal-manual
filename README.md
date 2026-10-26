@@ -73,3 +73,8 @@ Scrubber events use 4-point white circles, centered vertically, with the iOS
 half-point placement formula. The scrubber's playhead and section widths share
 the same native beat scale. Safari text selection is suppressed during timeline
 drags and restored on pointer release, cancellation, lost capture, or teardown.
+
+The illustration uses a fixed sparse event pattern. Section entries emit a random
+1–3 rings on each crossing, visually staggered by 70 ms to distinguish them.
+Pointer dragging follows the hand directly and releases with exponential momentum
+using the normal iOS scroll deceleration rate; grabbing or using controls cancels it.

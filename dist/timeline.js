@@ -6,7 +6,12 @@ const PetalTimeline = (() => {
     { name: "Verse", start: 16, beats: 16, color: "#66BD48" },
     { name: "Chorus", start: 32, beats: 16, color: "#8A49A8" },
   ];
-  const events = [0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44];
+  const events = [3, 9.5, 14, 21, 27.5, 35, 43];
+  const sectionEventCount = (random = Math.random) => 1 + Math.min(2, Math.floor(random() * 3));
+  // UIScrollView normal deceleration: velocity retains 0.998 per millisecond.
+  function dragDistance(velocity, elapsed) {
+    return velocity * (1 - Math.pow(.998, elapsed)) / -Math.log(.998);
+  }
   function stickyOffset(scrollLeft, viewportWidth, start, width, labelWidth) {
     const desired = scrollLeft + 59 - viewportWidth / 2 - start;
     return Math.min(Math.max(desired, 0), Math.max(0, width - 62 - labelWidth));
@@ -70,6 +75,7 @@ const PetalTimeline = (() => {
     const scrubber = mini.parentElement;
     const reduced = matchMedia("(prefers-reduced-motion: reduce)");
     let beat = 0, playing = false, frameID = 0, lastBeat = -1, playbackStartBeat = 0;
+    let coastID = 0;
     let pointer = null, labels = [], labelWidths = [], destroyed = false;
     let previousWidth = 0, scrubberWidth = 0, animations = [], worldAnimation = null;
 
@@ -93,7 +99,12 @@ const PetalTimeline = (() => {
       mini.style.transform = "translate3d(" + scrubberHeadX(p.beat, scrubberWidth) + "px,0,0)";
       metadata();
     }
+    function cancelCoast() {
+      cancelAnimationFrame(coastID);
+      coastID = 0;
+    }
     function cancelMotion() {
+      cancelCoast();
       beat = currentBeat();
       playing = false;
       cancelAnimationFrame(frameID);
@@ -120,25 +131,38 @@ const PetalTimeline = (() => {
       update();
       updateButton();
     }
-    function emit(eventBeat) {
+    function emit(eventBeat, burstIndex = 0) {
       if (reduced.matches || rippleLayer.childElementCount >= 12) return;
       const carrier = document.createElement("span");
       carrier.className = "petal-ripple-carrier";
       const ring = document.createElement("span");
       ring.className = "petal-ripple";
+      if (rippleLayer.childElementCount >= 3) {
+        rippleLayer.querySelectorAll(".petal-ripple").forEach(active => active.classList.add("is-burst"));
+        ring.classList.add("is-burst");
+      }
+      // A small visual stagger makes simultaneous section events readable.
+      const duration = 580 + burstIndex * 70;
+      ring.style.animationDelay = (burstIndex * 70) + "ms";
       carrier.append(ring);
       ring.addEventListener("animationend", () => carrier.remove(), {once:true});
       rippleLayer.append(carrier);
       const startX = previousWidth / 2 + (eventBeat - beat) * beatWidth;
       carrier.animate([
         {transform:"translate3d(" + startX + "px,0,0)"},
-        {transform:"translate3d(" + (startX - 124 * .58) + "px,0,0)"},
-      ], {duration:580, easing:"linear", fill:"forwards"});
+        {transform:"translate3d(" + (startX - 124 * duration / 1000) + "px,0,0)"},
+      ], {duration, easing:"linear", fill:"forwards"});
     }
     function frame() {
       if (!playing || destroyed) return;
       beat = currentBeat();
-      if (beat - lastBeat < 2) events.filter(b => b > lastBeat && b <= beat).forEach(emit);
+      if (beat - lastBeat < 2) {
+        events.filter(b => b > lastBeat && b <= beat).forEach(eventBeat => emit(eventBeat));
+        sections.filter(section => section.start > lastBeat && section.start <= beat).forEach(section => {
+          const count = sectionEventCount();
+          for (let index = 0; index < count; index++) emit(section.start, index);
+        });
+      }
       lastBeat = beat;
       // No geometry reads or motion-style writes in this loop. Only the caption
       // and occasional event notification depend on main-thread frame delivery.
@@ -146,6 +170,7 @@ const PetalTimeline = (() => {
       if (beat < totalBeats) frameID = requestAnimationFrame(frame);
     }
     function start() {
+      cancelCoast();
       if (beat >= totalBeats) seek(0);
       const plan = motionPlan(beat, previousWidth, labelWidths, scrubberWidth);
       if (plan.duration <= 0) return;
@@ -213,18 +238,40 @@ const PetalTimeline = (() => {
       document.getSelection?.()?.removeAllRanges();
       document.body.classList.add("petal-timeline-dragging");
       pause();
-      pointer = {id:event.pointerId, x:event.clientX, scroll:beat * beatWidth};
+      pointer = {id:event.pointerId, x:event.clientX, scroll:beat * beatWidth, lastX:event.clientX, lastTime:event.timeStamp, velocity:0};
       viewport.setPointerCapture(event.pointerId);
       viewport.classList.add("is-scrubbing");
     });
     viewport.addEventListener("pointermove", event => {
       if (!pointer || event.pointerId !== pointer.id) return;
+      const elapsed = event.timeStamp - pointer.lastTime;
+      if (elapsed > 0) pointer.velocity = (pointer.lastX - event.clientX) / elapsed;
+      pointer.lastX = event.clientX;
+      pointer.lastTime = event.timeStamp;
       seek((pointer.scroll - (event.clientX - pointer.x)) / beatWidth);
     });
-    const endDrag = () => {
+    function coast(velocity) {
+      if (reduced.matches || Math.abs(velocity) < .02) return;
+      const startBeat = beat;
+      let origin;
+      const tick = now => {
+        if (destroyed) return;
+        origin ??= now;
+        const elapsed = now - origin;
+        const target = startBeat + dragDistance(velocity, elapsed) / beatWidth;
+        seek(target);
+        if (target > 0 && target < totalBeats && Math.abs(velocity * Math.pow(.998, elapsed)) > .02) {
+          coastID = requestAnimationFrame(tick);
+        } else coastID = 0;
+      };
+      coastID = requestAnimationFrame(tick);
+    }
+    const endDrag = event => {
+      const released = pointer;
       pointer = null;
       viewport.classList.remove("is-scrubbing");
       document.body.classList.remove("petal-timeline-dragging");
+      if (released && event?.type === "pointerup" && event.timeStamp - released.lastTime < 100) coast(released.velocity);
     };
     const preventSelection = event => { if (pointer) event.preventDefault(); };
     document.addEventListener("selectstart", preventSelection);
@@ -270,5 +317,5 @@ const PetalTimeline = (() => {
       cancelMotion(); resize.disconnect(); visibility.disconnect();
     }};
   }
-  return {markup, attach, stickyOffset, position, motionPlan, scrubberEventX, scrubberHeadX};
+  return {markup, attach, stickyOffset, position, motionPlan, scrubberEventX, scrubberHeadX, sectionEventCount, dragDistance};
 })();

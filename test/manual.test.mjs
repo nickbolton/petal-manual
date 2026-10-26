@@ -203,7 +203,7 @@ test("appearance starts playback, preserves manual pause, and cleans up observer
 test("scrubber event dots use native half-point positions and align with its playhead", async () => {
   const source = await readFile(new URL("../dist/timeline.js", import.meta.url), "utf8");
   const timeline = vm.runInContext(source + "\nPetalTimeline", vm.createContext({}));
-  assert.equal([...timeline.markup().matchAll(/class="petal-mini-event"/g)].length,12);
+  assert.equal([...timeline.markup().matchAll(/class="petal-mini-event"/g)].length,7);
   for (const width of [280,520,640]) {
     const unit = (width - 4) / 48;
     for (const beat of [0,4,16,32,44]) {
@@ -211,4 +211,18 @@ test("scrubber event dots use native half-point positions and align with its pla
       assert.equal(timeline.scrubberHeadX(beat,width), Math.max(0,beat * unit - 2));
     }
   }
+});
+
+
+test("fixed sparse events, random section counts, and continuous drag deceleration", async () => {
+  const source = await readFile(new URL("../dist/timeline.js", import.meta.url), "utf8");
+  const timeline = vm.runInContext(source + "\nPetalTimeline", vm.createContext({}));
+  assert.equal(timeline.markup(), timeline.markup());
+  assert.equal(timeline.sectionEventCount(() => 0), 1);
+  assert.equal(timeline.sectionEventCount(() => .5), 2);
+  assert.equal(timeline.sectionEventCount(() => .99999), 3);
+  assert.equal(timeline.dragDistance(1, 0), 0);
+  assert.ok(timeline.dragDistance(1, 100) > 90);
+  assert.ok(timeline.dragDistance(1, 200) - timeline.dragDistance(1, 100) < timeline.dragDistance(1, 100));
+  assert.equal(timeline.dragDistance(-1, 100), -timeline.dragDistance(1, 100));
 });
