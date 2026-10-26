@@ -169,6 +169,9 @@ test("React Strict Mode remounts without duplicate timeline handlers; gestures a
   const animations: {currentTime:number;cancelled?:boolean;cancel():void}[]=[];
   const frames=new Map<number,FrameRequestCallback>();let frame=0;
   const reducedMotion={matches:false};
+  let clock=1000;
+  const nativePerformance=globalThis.performance;
+  set("performance",new Proxy(nativePerformance,{get(target,key){if(key==="now")return ()=>clock;const value=Reflect.get(target,key,target);return typeof value==="function"?value.bind(target):value;}}));
   const setCapture=()=>{};
   Object.defineProperty(windows.HTMLElement.prototype,"clientWidth",{get:()=>640});
   Object.defineProperty(windows.HTMLElement.prototype,"offsetWidth",{get:()=>140});
@@ -189,9 +192,9 @@ test("React Strict Mode remounts without duplicate timeline handlers; gestures a
     const viewport=windows.document.getElementById("demo-viewport")!;
     const play=windows.document.getElementById("demo-play")!;
     const mini=windows.document.getElementById("demo-mini-head")!.parentElement!;
-    const pointer=(target:Element,type:string,x:number,time:number)=>{
+    const pointer=(target:Element,type:string,x:number,time:number,y=100)=>{
       const event=new windows.Event(type,{bubbles:true,cancelable:true});
-      Object.assign(event,{button:0,pointerId:1,clientX:x});Object.defineProperty(event,"timeStamp",{value:time});target.dispatchEvent(event);
+      Object.assign(event,{button:0,pointerId:1,clientX:x,clientY:y});Object.defineProperty(event,"timeStamp",{value:time});target.dispatchEvent(event);
     };
     play.click();assert.equal(play.getAttribute("aria-pressed"),"true");assert.equal(animations.length,5);
     play.click();assert.equal(play.getAttribute("aria-pressed"),"false");
@@ -210,11 +213,52 @@ test("React Strict Mode remounts without duplicate timeline handlers; gestures a
     assert.match(windows.document.getElementById("demo-position")!.textContent!,/Verse/);
     pointer(mini,"pointerup",1000,70);assert.match(windows.document.getElementById("demo-position")!.textContent!,/Bar 12/);
     const section=mini.querySelector<HTMLButtonElement>("button")!;section.click();assert.match(windows.document.getElementById("demo-position")!.textContent!,/Bar 1/);
-    pointer(mini,"pointerdown",100,80);pointer(mini,"pointermove",400,100);
+    // Vertical wheel gestures can begin outside the illustration, then drift
+    // diagonally over it during momentum without seeking or cancelling playback.
+    play.click();
+    const playingAnimationCount=animations.length;
+    const playingPosition=windows.document.getElementById("demo-position")!.textContent;
+    const wheel=(target:EventTarget,x:number,y:number,options:WheelEventInit={})=>{
+      const event=new windows.WheelEvent("wheel",{bubbles:true,cancelable:true,deltaX:x,deltaY:y,...options});target.dispatchEvent(event);return event;
+    };
+    wheel(windows.document.body,2,50);
+    assert.equal(wheel(viewport,12,1).defaultPrevented,false);
+    assert.equal(play.getAttribute("aria-pressed"),"true");
+    assert.equal(windows.document.getElementById("demo-position")!.textContent,playingPosition);
+    pointer(viewport,"pointerdown",100,110);pointer(viewport,"pointermove",160,130);
+    assert.equal(play.getAttribute("aria-pressed"),"true");
+    assert.equal(windows.document.body.classList.contains("petal-timeline-dragging"),false);
+    // Once scrolling settles, a vertical finger gesture over either surface
+    // still belongs to the page; a pointer down alone never pauses playback.
+    clock+=250;
+    pointer(viewport,"pointerdown",100,140);pointer(viewport,"pointermove",102,160,180);
+    assert.equal(play.getAttribute("aria-pressed"),"true");
+    pointer(mini,"pointerdown",100,170);pointer(mini,"pointermove",102,190,180);
+    assert.equal(play.getAttribute("aria-pressed"),"true");
+    section.dispatchEvent(new windows.MouseEvent("click",{bubbles:true,cancelable:true,detail:1}));
+    assert.equal(play.getAttribute("aria-pressed"),"true");
+    // Actual page scrolling also suppresses interactions without requiring wheel
+    // events (touchscreen scrolling and its momentum use this path).
+    windows.dispatchEvent(new windows.Event("scroll"));
+    pointer(mini,"pointerdown",100,200);pointer(mini,"pointermove",400,220);
+    assert.equal(play.getAttribute("aria-pressed"),"true");
+    clock+=250;
+    assert.equal(wheel(viewport,30,1).defaultPrevented,true);
+    assert.equal(play.getAttribute("aria-pressed"),"false");
+    assert.equal(animations.length,playingAnimationCount);
+    // Pinch gestures must never be treated as timeline wheel scrubbing.
+    play.click();
+    assert.equal(wheel(viewport,15,1,{ctrlKey:true}).defaultPrevented,false);
+    assert.equal(play.getAttribute("aria-pressed"),"true");
+    assert.equal(wheel(viewport,0,25,{shiftKey:true}).defaultPrevented,true);
+    assert.equal(play.getAttribute("aria-pressed"),"false");
+    clock+=250;
+    pointer(mini,"pointerdown",100,230);pointer(mini,"pointermove",400,250);
+    const finalAnimationCount=animations.length;
     await act(async()=>root.unmount());
     assert.equal(windows.document.body.classList.contains("petal-timeline-dragging"),false);
     assert.equal(frames.size,0);assert.ok(observers.every(observer=>observer.disconnected));
-    play.click();assert.equal(animations.length,5);
+    play.click();assert.equal(animations.length,finalAnimationCount);
   } finally {
     for(const [key,descriptor] of previous) {if(descriptor) Object.defineProperty(globalThis,key,descriptor);else Reflect.deleteProperty(globalThis,key);}
     windows.close();

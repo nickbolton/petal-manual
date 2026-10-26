@@ -226,7 +226,9 @@ controller handles animation and gestures without per-frame React state updates.
 The sample events follow a fixed sparse pattern. Section entries fire a random
 1–3 ripples at runtime. The illustration starts when visible, pauses offscreen,
 and respects manual pause. Reduced Motion disables autoplay and uses manual
-bar-by-bar stepping instead. No MIDI or audio is sent.
+bar-by-bar stepping instead. Vertical page scrolling and its momentum do not
+scrub or pause playback; timeline and overview drags start only after clear
+horizontal movement. No MIDI or audio is sent.
 
 ## Troubleshooting
 

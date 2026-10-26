@@ -85,8 +85,8 @@ export function attach(root: HTMLElement) {
   const reduced = matchMedia("(prefers-reduced-motion: reduce)");
   let beat = 0, playing = false, frameID = 0, lastBeat = -1, playbackStartBeat = 0;
   let coastID = 0, visualScroll: number | null = null;
-  let scrubPointer: {id:number; x:number; left:number; width:number; dragging:boolean} | null = null, suppressSectionClick = false;
-  let pointer: {id:number; x:number; scroll:number; lastX:number; lastTime:number; velocity:number} | null = null;
+  let scrubPointer: {id:number; x:number; y:number; left:number; width:number; dragging:boolean} | null = null, suppressSectionClick = false;
+  let pointer: {id:number; x:number; y:number; dragging:boolean; scroll:number; lastX:number; lastTime:number; velocity:number} | null = null;
   let labels: HTMLElement[] = [], labelWidths: number[] = [], destroyed = false;
   let previousWidth = 0, scrubberWidth = 0, animations: Animation[] = [], worldAnimation: Animation | null = null;
 
@@ -239,31 +239,61 @@ export function attach(root: HTMLElement) {
     if (playing) pause(); else start();
   });
   listen(stop, "click", () => { pause(); seek(0); });
+  // Lock the axis for a wheel gesture, including its momentum tail. Observe the
+  // whole page so a vertical gesture stays vertical when crossing the timeline.
+  const scrollIdleMs = 200;
+  let wheelAxis: "horizontal" | "vertical" | null = null;
+  let lastWheelAt = -Infinity, lastPageScrollAt = -Infinity;
+  const pageIsScrolling = () => performance.now() - lastPageScrollAt < scrollIdleMs;
+  const observeWheel = (event: WheelEvent) => {
+    if (event.ctrlKey || (!event.deltaX && !event.deltaY)) return;
+    const now = performance.now();
+    if (now - lastWheelAt > scrollIdleMs) wheelAxis = null;
+    if (event.shiftKey) wheelAxis = "horizontal";
+    else if (Math.abs(event.deltaY) >= Math.abs(event.deltaX)) wheelAxis = "vertical";
+    wheelAxis ??= Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? "vertical" : "horizontal";
+    lastWheelAt = now;
+    if (wheelAxis === "vertical") lastPageScrollAt = now;
+  };
+  const observePageScroll = () => { lastPageScrollAt = performance.now(); };
+  document.addEventListener("wheel", observeWheel, {capture:true, passive:true});
+  window.addEventListener("scroll", observePageScroll, {passive:true});
+  cleanup.push(() => document.removeEventListener("wheel", observeWheel, true));
+  cleanup.push(() => window.removeEventListener("scroll", observePageScroll));
   listen(viewport, "wheel", event => {
-    const delta = event.shiftKey ? event.deltaY : event.deltaX;
-    if (!delta || (!event.shiftKey && Math.abs(event.deltaX) < Math.abs(event.deltaY))) return;
+    if (event.ctrlKey || wheelAxis !== "horizontal" || (pageIsScrolling() && !event.shiftKey)) return;
+    const delta = event.shiftKey ? event.deltaY || event.deltaX : event.deltaX;
+    if (!delta) return;
     event.preventDefault(); pause();
     const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? previousWidth : 1;
     seek(beat + delta * unit / beatWidth);
   }, {passive:false});
   listen(viewport, "pointerdown", event => {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    viewport.focus({preventScroll:true});
-    document.getSelection?.()?.removeAllRanges();
-    document.body.classList.add("petal-timeline-dragging");
-    pause();
-    pointer = {id:event.pointerId, x:event.clientX, scroll:beat * beatWidth, lastX:event.clientX, lastTime:event.timeStamp, velocity:0};
-    viewport.setPointerCapture(event.pointerId);
-    viewport.classList.add("is-scrubbing");
+    if (event.button !== 0 || pageIsScrolling()) return;
+    // Do not pause or capture until a deliberate horizontal drag is established.
+    pointer = {id:event.pointerId, x:event.clientX, y:event.clientY, dragging:false, scroll:0, lastX:event.clientX, lastTime:event.timeStamp, velocity:0};
   });
   listen(viewport, "pointermove", event => {
     if (!pointer || event.pointerId !== pointer.id) return;
+    const dx = event.clientX - pointer.x, dy = event.clientY - pointer.y;
+    if (!pointer.dragging) {
+      if (pageIsScrolling() || (Math.abs(dy) > 6 && Math.abs(dy) >= Math.abs(dx))) { pointer = null; return; }
+      if (Math.abs(dx) <= 6 || Math.abs(dx) <= Math.abs(dy)) return;
+      pause();
+      pointer.scroll = beat * beatWidth;
+      pointer.dragging = true;
+      viewport.focus({preventScroll:true});
+      document.getSelection?.()?.removeAllRanges();
+      document.body.classList.add("petal-timeline-dragging");
+      viewport.setPointerCapture(event.pointerId);
+      viewport.classList.add("is-scrubbing");
+    }
+    event.preventDefault();
     const elapsed = event.timeStamp - pointer.lastTime;
     if (elapsed > 0) pointer.velocity = (pointer.lastX - event.clientX) / elapsed;
     pointer.lastX = event.clientX;
     pointer.lastTime = event.timeStamp;
-    const rawScroll = pointer.scroll - (event.clientX - pointer.x);
+    const rawScroll = pointer.scroll - dx;
     visualScroll = rubberBand(rawScroll, previousWidth);
     seek(rawScroll / beatWidth);
   });
@@ -315,14 +345,14 @@ export function attach(root: HTMLElement) {
     pointer = null;
     viewport.classList.remove("is-scrubbing");
     document.body.classList.remove("petal-timeline-dragging");
-    if (!released || destroyed) return;
+    if (!released?.dragging || destroyed) return;
     if (visualScroll !== null && (visualScroll < 0 || visualScroll > totalBeats * beatWidth)) springBack();
     else {
       visualScroll = null;
       if (event?.type === "pointerup" && event.timeStamp - released.lastTime < 100) coast(released.velocity);
     }
   };
-  const preventSelection = (event: Event) => { if (pointer || scrubPointer) event.preventDefault(); };
+  const preventSelection = (event: Event) => { if (pointer?.dragging || scrubPointer?.dragging) event.preventDefault(); };
   document.addEventListener("selectstart", preventSelection);
   listen(viewport, "dragstart", event => event.preventDefault());
   listen(viewport, "lostpointercapture", endDrag);
@@ -346,14 +376,17 @@ export function attach(root: HTMLElement) {
   };
   listen(scrubber, "pointerdown", event => {
     if (event.button !== 0) return;
-    suppressSectionClick = false;
+    suppressSectionClick = pageIsScrolling();
+    if (suppressSectionClick) return;
     const bounds = scrubber.getBoundingClientRect();
-    scrubPointer = {id:event.pointerId, x:event.clientX, left:bounds.left, width:bounds.width, dragging:false};
+    scrubPointer = {id:event.pointerId, x:event.clientX, y:event.clientY, left:bounds.left, width:bounds.width, dragging:false};
   });
   listen(scrubber, "pointermove", event => {
     if (!scrubPointer || scrubPointer.id !== event.pointerId) return;
-    if (!scrubPointer.dragging && Math.abs(event.clientX - scrubPointer.x) <= 1) return;
     if (!scrubPointer.dragging) {
+      const dx = Math.abs(event.clientX - scrubPointer.x), dy = Math.abs(event.clientY - scrubPointer.y);
+      if (pageIsScrolling() || (dy > 6 && dy >= dx)) { scrubPointer = null; suppressSectionClick = true; return; }
+      if (dx <= 6 || dx <= dy) return;
       pause();
       scrubber.setPointerCapture(event.pointerId);
       scrubPointer.dragging = true;
@@ -375,7 +408,7 @@ export function attach(root: HTMLElement) {
   listen(scrubber, "lostpointercapture", endScrub);
   listen(scrubber, "dragstart", event => event.preventDefault());
   listen(scrubber, "click", event => {
-    if (suppressSectionClick && event.detail !== 0) { event.preventDefault(); event.stopPropagation(); }
+    if ((suppressSectionClick || pageIsScrolling()) && event.detail !== 0) { event.preventDefault(); event.stopPropagation(); }
   }, true);
   root.querySelectorAll<HTMLElement>(".petal-mini-section").forEach(button => listen(button, "click", () => { pause(); seek(Number(button.dataset.beat)); }));
   const resize = new ResizeObserver(buildWorld);
