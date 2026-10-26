@@ -74,3 +74,8 @@
 body.petal-timeline-dragging,body.petal-timeline-dragging *{-webkit-user-select:none!important;user-select:none!important;cursor:grabbing!important}
 
 .petal-ripple.is-burst{border-color:#00a1e5}
+
+/* Programmatic pointer focus must not paint Safari's native blue region outline. */
+.petal-viewport:focus{outline:none}
+.petal-viewport:focus-visible{outline:2px solid #00a1e5;outline-offset:-2px}
+.petal-viewport.is-scrubbing:focus{outline:none}
