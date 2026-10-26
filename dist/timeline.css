@@ -24,10 +24,11 @@
 .petal-section-label>span{font-size:17px;color:#ffffff99;font-weight:400;line-height:1}
 .petal-beat-strip{position:absolute;top:57px;left:0;right:0;height:60px;border-radius:16px;background:repeating-linear-gradient(90deg,transparent 0px,transparent 60px,#0003 60px,#0003 62px),var(--section-color)}
 .petal-event{position:absolute;top:122px;width:16px;height:16px;border-radius:50%;background:#fff;z-index:2}
-.petal-measure{position:absolute;top:159px;width:246px;height:45px;font-size:17px;color:#fff}
+.petal-measure{position:absolute;top:159px;width:246px;height:45px;font-size:17px;color:#fff;z-index:3}
 .petal-measure>strong{display:block;font-size:17px;font-weight:700;line-height:1;position:absolute;top:-1px;left:-.5px}
-.petal-measure>div{display:flex;position:absolute;top:24px;left:-.5px;line-height:1}
-.petal-measure span{display:block;width:62px;font-size:17px;font-weight:400;color:#fff}
+/* Beat numbers overlay the colored section strip, four points below its top. */
+.petal-measure>div{display:flex;position:absolute;top:-55px;left:-.5px;line-height:1}
+.petal-measure span{display:block;width:62px;font-size:17px;font-weight:300;color:#ffffff99}
 .petal-fixed-playhead{position:absolute;pointer-events:none;top:30px;left:calc(50% - 1px);width:2px;height:200px;background:#fff;z-index:5}
 .petal-ripples{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:4}
 .petal-ripple{position:absolute;top:30px;margin-left:-100px;width:200px;height:200px;border-radius:50%;border:1px solid white;opacity:0;animation:petal-ring .58s ease-out forwards}
