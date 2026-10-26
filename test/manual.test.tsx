@@ -105,19 +105,14 @@ test("Safari compositor motion shares a linear clock across timeline, labels, an
       assert.equal(frames.at(-1).offset, 1);
       for (const frame of frames) {
         const scroll = beat * 62 + frame.offset * (48 - beat) * 62;
-        const expected = 320 + index * 992 - scroll + timeline.stickyOffset(scroll, 640, index * 992, 990, [140, 150, 180][index]);
+        const expected = timeline.stickyOffset(scroll, 640, index * 992, 990, [140, 150, 180][index]);
         assert.equal(frame.transform, "translate3d(" + expected + "px,0,0)");
       }
     }
   }
-  const playback = source.slice(source.indexOf("  function scheduleRipples("), source.indexOf("  function buildWorld()"));
-  assert.ok(!playback.includes("requestAnimationFrame"));
-  assert.ok(!playback.includes("createElement"));
-  assert.ok(!playback.includes(".style."));
-  const document = new JSDOM(renderToStaticMarkup(<Timeline/>)).window.document;
-  assert.equal(document.querySelector(".petal-world .petal-section-label"),null);
-  assert.equal(document.querySelectorAll(".petal-headers>.petal-section-label").length,3);
-  assert.equal(document.querySelectorAll(".petal-ripple-carrier").length,12);
+  const frameLoop = source.slice(source.indexOf("  function frame() {"), source.indexOf("  function start() {"));
+  assert.ok(!frameLoop.includes(".style."));
+  assert.ok(!frameLoop.includes("clientWidth"));
   assert.ok(source.includes("animation.startTime = origin"));
 });
 
@@ -198,16 +193,13 @@ test("React Strict Mode remounts without duplicate timeline handlers; gestures a
       const event=new windows.Event(type,{bubbles:true,cancelable:true});
       Object.assign(event,{button:0,pointerId:1,clientX:x});Object.defineProperty(event,"timeStamp",{value:time});target.dispatchEvent(event);
     };
-    play.click();assert.equal(play.getAttribute("aria-pressed"),"true");
-    const playbackAnimationCount=animations.length;
-    assert.ok(playbackAnimationCount>=25 && playbackAnimationCount<=37);
-    assert.equal(frames.size,0);
+    play.click();assert.equal(play.getAttribute("aria-pressed"),"true");assert.equal(animations.length,5);
     play.click();assert.equal(play.getAttribute("aria-pressed"),"false");
     reducedMotion.matches=true;
     observers.at(-1)!.callback([{isIntersecting:true,intersectionRatio:.5} as IntersectionObserverEntry], {} as IntersectionObserver);
     assert.equal(play.getAttribute("aria-pressed"),"false");
     play.click();assert.match(windows.document.getElementById("demo-position")!.textContent!,/Bar 2/);
-    assert.equal(animations.length,playbackAnimationCount);
+    assert.equal(animations.length,5);
     reducedMotion.matches=false;
     windows.document.getElementById("demo-stop")!.click();
     pointer(viewport,"pointerdown",200,0);pointer(viewport,"pointermove",350,20);
@@ -222,7 +214,7 @@ test("React Strict Mode remounts without duplicate timeline handlers; gestures a
     await act(async()=>root.unmount());
     assert.equal(windows.document.body.classList.contains("petal-timeline-dragging"),false);
     assert.equal(frames.size,0);assert.ok(observers.every(observer=>observer.disconnected));
-    play.click();assert.equal(animations.length,playbackAnimationCount);
+    play.click();assert.equal(animations.length,5);
   } finally {
     for(const [key,descriptor] of previous) {if(descriptor) Object.defineProperty(globalThis,key,descriptor);else Reflect.deleteProperty(globalThis,key);}
     windows.close();
@@ -257,22 +249,5 @@ test("theme preference survives remounts and bootstraps before hydration",async(
     await act(async()=>root.unmount());
   }finally{
     for(const [key,descriptor] of old){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else Reflect.deleteProperty(globalThis,key);}dom.window.close();
-  }
-});
-
-
-test("pooled ripples share playback timing and slots never overlap",()=>{
-  for(const start of [0,3.25,16,31.9,48]) {
-    const schedule=timeline.rippleSchedule(start,()=>.999);
-    assert.equal(schedule.filter(event=>event.beat===16).length,start<=16?3:0);
-    assert.ok(schedule.every(event=>event.beat>=start && event.slot<12));
-    for(const event of schedule) {
-      assert.equal(event.delay,(event.beat-start)*500);
-      assert.equal(event.duration,event.stagger+580);
-      for(const other of schedule) {
-        if(event===other || event.slot!==other.slot) continue;
-        assert.ok(event.delay+event.duration<=other.delay || other.delay+other.duration<=event.delay);
-      }
-    }
   }
 });

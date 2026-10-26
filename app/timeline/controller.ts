@@ -53,7 +53,7 @@ export function motionPlan(fromBeat: number, viewportWidth: number, labelWidths:
     const stops = Array.from(new Set([start, pinStart, pinEnd, end].filter(x => x >= start && x <= end))).sort((a,b) => a-b);
     return stops.map(offset => ({
       offset: span ? (offset - start) / span : 0,
-      transform: translation(viewportWidth / 2 + sectionStart - offset + stickyOffset(offset, viewportWidth, sectionStart, sectionWidth, labelWidth)),
+      transform: translation(stickyOffset(offset, viewportWidth, sectionStart, sectionWidth, labelWidth)),
     }));
   });
   const miniStart = position(fromBeat).beat;
@@ -66,26 +66,6 @@ export function motionPlan(fromBeat: number, viewportWidth: number, labelWidths:
     labels: labelFrames,
     mini: miniStops.map(value => ({offset:(value - miniStart) / (totalBeats - miniStart || 1), transform:translation(scrubberHeadX(value, scrubberWidth))})),
   };
-}
-export const rippleLimit = 12;
-export function rippleSchedule(fromBeat: number, random = Math.random) {
-  const start = position(fromBeat).beat;
-  const entries = events.filter(beat => beat >= start).map(beat => ({beat, index:0}));
-  sections.filter(section => section.start >= start).forEach(section => {
-    const count = sectionEventCount(random);
-    for (let index = 0; index < count; index++) entries.push({beat:section.start, index});
-  });
-  entries.sort((a,b) => a.beat-b.beat || a.index-b.index);
-  const available = Array<number>(rippleLimit).fill(0);
-  return entries.flatMap(event => {
-    const delay = (event.beat - start) * 500;
-    const slot = available.findIndex(end => end <= delay);
-    if (slot < 0) return [];
-    const stagger = event.index * 70;
-    const duration = 580 + stagger;
-    available[slot] = delay + duration;
-    return [{...event, slot, delay, stagger, duration}];
-  });
 }
 export function attach(root: HTMLElement) {
   const find = (id: string) => root.querySelector<HTMLElement>("#" + id)!;
@@ -101,11 +81,9 @@ export function attach(root: HTMLElement) {
   const mini = find("demo-mini-head");
   const caption = find("demo-position");
   const rippleLayer = find("demo-ripples");
-  const rippleSlots = Array.from(rippleLayer.querySelectorAll<HTMLElement>(".petal-ripple-carrier")).map(carrier => ({carrier, ring:carrier.querySelector<HTMLElement>(".petal-ripple")!}));
   const scrubber = mini.parentElement!;
   const reduced = matchMedia("(prefers-reduced-motion: reduce)");
-  let beat = 0, playing = false, playbackStartBeat = 0;
-  let captionTimer: ReturnType<typeof setTimeout> | undefined;
+  let beat = 0, playing = false, frameID = 0, lastBeat = -1, playbackStartBeat = 0;
   let coastID = 0, visualScroll: number | null = null;
   let scrubPointer: {id:number; x:number; left:number; width:number; dragging:boolean} | null = null, suppressSectionClick = false;
   let pointer: {id:number; x:number; scroll:number; lastX:number; lastTime:number; velocity:number} | null = null;
@@ -127,7 +105,7 @@ export function attach(root: HTMLElement) {
     world.style.transform = "translate3d(" + (-scroll) + "px,0,0)";
     labels.forEach((label, index) => {
       const s = sections[index];
-      const offset = previousWidth / 2 + s.start * beatWidth - scroll + stickyOffset(scroll, previousWidth, s.start * beatWidth, s.beats * beatWidth - 2, labelWidths[index]);
+      const offset = stickyOffset(scroll, previousWidth, s.start * beatWidth, s.beats * beatWidth - 2, labelWidths[index]);
       label.style.transform = "translate3d(" + offset + "px,0,0)";
     });
     mini.style.transform = "translate3d(" + scrubberHeadX(p.beat, scrubberWidth) + "px,0,0)";
@@ -142,11 +120,11 @@ export function attach(root: HTMLElement) {
     cancelCoast();
     beat = currentBeat();
     playing = false;
-    clearTimeout(captionTimer);
-    captionTimer = undefined;
+    cancelAnimationFrame(frameID);
     animations.forEach(animation => animation.cancel());
     animations = [];
     worldAnimation = null;
+    rippleLayer.replaceChildren();
   }
   function updateButton() {
     play.setAttribute("aria-pressed", String(playing));
@@ -161,32 +139,48 @@ export function attach(root: HTMLElement) {
   function seek(value: number) {
     if (playing) cancelMotion();
     beat = position(value).beat;
+    lastBeat = beat;
+    rippleLayer.replaceChildren();
     update();
     updateButton();
   }
-  function scheduleRipples(origin: number) {
-    for (const event of rippleSchedule(playbackStartBeat)) {
-      const {carrier, ring} = rippleSlots[event.slot];
-      const x = previousWidth / 2;
-      const motion = carrier.animate([
-        {transform:`translate3d(${x}px,0,0)`},
-        {transform:`translate3d(${x - 124 * event.duration / 1000}px,0,0)`},
-      ], {delay:event.delay, duration:event.duration, easing:"linear", fill:"none"});
-      const expansion = ring.animate([
-        {offset:0, transform:"scale(.05)", opacity:0},
-        {offset:.1, opacity:.65},
-        {offset:1, transform:"scale(1)", opacity:0},
-      ], {delay:event.delay + event.stagger, duration:580, easing:"ease-out", fill:"none"});
-      motion.startTime = expansion.startTime = origin;
-      animations.push(motion, expansion);
+  function emit(eventBeat: number, burstIndex = 0) {
+    if (reduced.matches || rippleLayer.childElementCount >= 12) return;
+    const carrier = document.createElement("span");
+    carrier.className = "petal-ripple-carrier";
+    const ring = document.createElement("span");
+    ring.className = "petal-ripple";
+    if (rippleLayer.childElementCount >= 3) {
+      rippleLayer.querySelectorAll(".petal-ripple").forEach(active => active.classList.add("is-burst"));
+      ring.classList.add("is-burst");
     }
+    // A small visual stagger makes simultaneous section events readable.
+    const duration = 580 + burstIndex * 70;
+    ring.style.animationDelay = (burstIndex * 70) + "ms";
+    carrier.append(ring);
+    ring.addEventListener("animationend", () => carrier.remove(), {once:true});
+    rippleLayer.append(carrier);
+    const startX = previousWidth / 2 + (eventBeat - beat) * beatWidth;
+    carrier.animate([
+      {transform:"translate3d(" + startX + "px,0,0)"},
+      {transform:"translate3d(" + (startX - 124 * duration / 1000) + "px,0,0)"},
+    ], {duration, easing:"linear", fill:"forwards"});
   }
-  function scheduleCaption() {
+  function frame() {
     if (!playing || destroyed) return;
     beat = currentBeat();
+    if (beat - lastBeat < 2) {
+      events.filter(b => b > lastBeat && b <= beat).forEach(eventBeat => emit(eventBeat));
+      sections.filter(section => section.start > lastBeat && section.start <= beat).forEach(section => {
+        const count = sectionEventCount();
+        for (let index = 0; index < count; index++) emit(section.start, index);
+      });
+    }
+    lastBeat = beat;
+    // No geometry reads or motion-style writes in this loop. Only the caption
+    // and occasional event notification depend on main-thread frame delivery.
     metadata();
-    // The caption changes once per bar, not once per display frame.
-    if (beat < totalBeats) captionTimer = setTimeout(scheduleCaption, Math.max(16, (4 - beat % 4) * 500));
+    if (beat < totalBeats) frameID = requestAnimationFrame(frame);
   }
   function start() {
     cancelCoast();
@@ -194,16 +188,15 @@ export function attach(root: HTMLElement) {
     const plan = motionPlan(beat, previousWidth, labelWidths, scrubberWidth);
     if (plan.duration <= 0) return;
     playbackStartBeat = beat;
+    lastBeat = beat - .001;
     const options: KeyframeAnimationOptions = {duration:plan.duration, easing:"linear", fill:"forwards"};
     worldAnimation = world.animate(plan.world, options);
     animations = [worldAnimation, ...labels.map((label,index) => label.animate(plan.labels[index], options)), mini.animate(plan.mini, options)];
-    // One timeline origin keeps the independent track, headers, and overview
+    // One timeline origin keeps the counter-moving sticky headers and overview
     // exactly in phase, including Safari's compositor-only animation frames.
     const origin = document.timeline.currentTime as number;
     animations.forEach(animation => { animation.startTime = origin; });
-    scheduleRipples(origin);
     playing = true;
-    scheduleCaption();
     updateButton();
     const activeAnimation = worldAnimation;
     activeAnimation.onfinish = () => {
@@ -214,7 +207,7 @@ export function attach(root: HTMLElement) {
       update();
       updateButton();
     };
-
+    frameID = requestAnimationFrame(frame);
   }
   function buildWorld() {
     const width = viewport.clientWidth;
@@ -228,7 +221,7 @@ export function attach(root: HTMLElement) {
     root.querySelectorAll<HTMLElement>("[data-world-beat]").forEach(element => {
       element.style.left = (width / 2 + Number(element.dataset.worldBeat) * beatWidth - Number(element.dataset.inset || 0)) + "px";
     });
-    labels = Array.from(root.querySelectorAll<HTMLElement>(".petal-section-label"));
+    labels = Array.from(world.querySelectorAll<HTMLElement>(".petal-section-label"));
     labelWidths = labels.map(label => label.offsetWidth);
     const overviewBeatWidth = scrubberBeatWidth(scrubberWidth);
     scrubber.querySelectorAll<HTMLElement>(".petal-mini-section").forEach((button, index) => {
