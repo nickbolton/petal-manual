@@ -86,6 +86,7 @@ const PetalTimeline = (() => {
     const reduced = matchMedia("(prefers-reduced-motion: reduce)");
     let beat = 0, playing = false, frameID = 0, lastBeat = -1, playbackStartBeat = 0;
     let coastID = 0, visualScroll = null;
+    let scrubPointer = null, suppressSectionClick = false;
     let pointer = null, labels = [], labelWidths = [], destroyed = false;
     let previousWidth = 0, scrubberWidth = 0, animations = [], worldAnimation = null;
 
@@ -319,7 +320,7 @@ const PetalTimeline = (() => {
         if (event?.type === "pointerup" && event.timeStamp - released.lastTime < 100) coast(released.velocity);
       }
     };
-    const preventSelection = event => { if (pointer) event.preventDefault(); };
+    const preventSelection = event => { if (pointer || scrubPointer) event.preventDefault(); };
     document.addEventListener("selectstart", preventSelection);
     viewport.addEventListener("dragstart", event => event.preventDefault());
     viewport.addEventListener("lostpointercapture", endDrag);
@@ -330,6 +331,49 @@ const PetalTimeline = (() => {
       event.preventDefault(); pause();
       seek(event.key === "Home" ? 0 : event.key === "End" ? totalBeats : beat + (event.key === "ArrowRight" ? 1 : -1));
     });
+    const scrubToPointer = clientX => {
+      const x = clientX - scrubPointer.left;
+      const unit = scrubberBeatWidth(scrubPointer.width);
+      const section = sections.find(s => x >= s.start * unit && x <= (s.start + s.beats) * unit - 2);
+      // Native scrubber maps within the section's visible strip, including its gaps.
+      const target = section
+        ? section.start + Math.max(0, Math.min(1, (x - section.start * unit) / (section.beats * unit - 2))) * section.beats
+        : x / scrubPointer.width * totalBeats;
+      seek(target);
+    };
+    scrubber.addEventListener("pointerdown", event => {
+      if (event.button !== 0) return;
+      suppressSectionClick = false;
+      const bounds = scrubber.getBoundingClientRect();
+      scrubPointer = {id:event.pointerId, x:event.clientX, left:bounds.left, width:bounds.width, dragging:false};
+    });
+    scrubber.addEventListener("pointermove", event => {
+      if (!scrubPointer || scrubPointer.id !== event.pointerId) return;
+      if (!scrubPointer.dragging && Math.abs(event.clientX - scrubPointer.x) <= 1) return;
+      if (!scrubPointer.dragging) {
+        pause();
+        scrubber.setPointerCapture(event.pointerId);
+        scrubPointer.dragging = true;
+        suppressSectionClick = true;
+        document.getSelection?.()?.removeAllRanges();
+        document.body.classList.add("petal-timeline-dragging");
+      }
+      event.preventDefault();
+      scrubToPointer(event.clientX);
+    });
+    const endScrub = event => {
+      if (!scrubPointer) return;
+      if (event?.type === "pointerup" && scrubPointer.dragging) scrubToPointer(event.clientX);
+      scrubPointer = null;
+      document.body.classList.remove("petal-timeline-dragging");
+    };
+    scrubber.addEventListener("pointerup", endScrub);
+    scrubber.addEventListener("pointercancel", endScrub);
+    scrubber.addEventListener("lostpointercapture", endScrub);
+    scrubber.addEventListener("dragstart", event => event.preventDefault());
+    scrubber.addEventListener("click", event => {
+      if (suppressSectionClick) { event.preventDefault(); event.stopPropagation(); }
+    }, true);
     document.querySelectorAll(".petal-mini-section").forEach(button => button.addEventListener("click", () => { pause(); seek(Number(button.dataset.beat)); }));
     const resize = new ResizeObserver(buildWorld);
     resize.observe(viewport);
@@ -358,6 +402,7 @@ const PetalTimeline = (() => {
     updateButton();
     return {destroy() {
       destroyed = true;
+      endScrub();
       endDrag();
       document.removeEventListener("selectstart", preventSelection);
       cancelMotion(); resize.disconnect(); visibility.disconnect();

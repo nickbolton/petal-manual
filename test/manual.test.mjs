@@ -129,7 +129,7 @@ test("appearance starts playback, preserves manual pause, and cleans up observer
       return {
         style:{}, clientWidth:640, offsetWidth:140, textContent:"", innerHTML:"", attributes:{}, handlers:{},
         classList:{add(value){classes.add(value);},remove(value){classes.delete(value);},contains(value){return classes.has(value);}}, childElementCount:0,
-        querySelectorAll(){return [];}, focus(){}, setPointerCapture(){},
+        getBoundingClientRect(){return {left:0,width:640};}, querySelectorAll(){return [];}, focus(){}, setPointerCapture(){},
         addEventListener(name, handler) { this.handlers[name] = handler; },
         setAttribute(name,value) { this.attributes[name] = value; },
         replaceChildren(){}, closest() { return this; },
@@ -187,6 +187,17 @@ test("appearance starts playback, preserves manual pause, and cleans up observer
     assert.equal(body.classList.contains("petal-timeline-dragging"),false);
     pointerDown();
     viewport.handlers.lostpointercapture();
+    assert.equal(body.classList.contains("petal-timeline-dragging"),false);
+    const scrubber = elements.get("demo-mini-head").parentElement;
+    scrubber.handlers.pointerdown({button:0,pointerId:2,clientX:100});
+    scrubber.handlers.pointermove({pointerId:2,clientX:400,preventDefault(){}});
+    assert.equal(body.classList.contains("petal-timeline-dragging"),true);
+    assert.ok(elements.get("demo-position").textContent.includes("Verse"));
+    let suppressed = false;
+    scrubber.handlers.click({preventDefault(){suppressed=true;},stopPropagation(){}});
+    assert.equal(suppressed,true);
+    scrubber.handlers.pointerup({type:"pointerup",clientX:1000});
+    assert.ok(elements.get("demo-position").textContent.includes("Bar 12"));
     assert.equal(body.classList.contains("petal-timeline-dragging"),false);
     pointerDown();
     controller.destroy();
