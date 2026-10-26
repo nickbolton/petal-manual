@@ -116,3 +116,64 @@ test("Safari compositor motion shares a linear clock across timeline, labels, an
   assert.ok(!frameLoop.includes("clientWidth"));
   assert.ok(source.includes("animation.startTime = origin"));
 });
+
+test("appearance starts playback, preserves manual pause, and cleans up observers", async () => {
+  const source = await readFile(new URL("../dist/timeline.js", import.meta.url), "utf8");
+  for (const reduceMotion of [false, true]) {
+    const elements = new Map();
+    const createdAnimations = [];
+    let visibility;
+    function element() {
+      return {
+        style:{}, clientWidth:640, offsetWidth:140, textContent:"", innerHTML:"", attributes:{}, handlers:{},
+        classList:{add(){},remove(){}}, childElementCount:0,
+        addEventListener(name, handler) { this.handlers[name] = handler; },
+        setAttribute(name,value) { this.attributes[name] = value; },
+        replaceChildren(){}, closest() { return this; },
+        animate() {
+          const animation = {currentTime:0, cancel(){this.cancelled=true;}};
+          createdAnimations.push(animation); return animation;
+        },
+      };
+    }
+    for (const id of ["demo-viewport","demo-world","demo-play","demo-stop","demo-mini-head","demo-position","demo-ripples"]) elements.set(id,element());
+    elements.get("demo-mini-head").parentElement = element();
+    elements.get("demo-world").querySelectorAll = () => [element(),element(),element()];
+    const context = vm.createContext({
+      document:{getElementById:id=>elements.get(id),querySelectorAll:()=>[],timeline:{currentTime:100},fonts:{ready:Promise.resolve()}},
+      matchMedia:()=>({matches:reduceMotion}),requestAnimationFrame:()=>1,cancelAnimationFrame(){},
+      ResizeObserver:class{observe(){} disconnect(){}},
+      IntersectionObserver:class{
+        constructor(callback) { this.callback=callback;visibility=this; }
+        observe(){} disconnect(){this.disconnected=true;}
+      },
+    });
+    const timeline = vm.runInContext(source + "\nPetalTimeline", context);
+    const controller = timeline.attach();
+    await Promise.resolve();
+    assert.equal(createdAnimations.length,0);
+    const show = () => visibility.callback([{isIntersecting:true,intersectionRatio:.5}]);
+    const hide = () => visibility.callback([{isIntersecting:false,intersectionRatio:0}]);
+    show();
+    const play = elements.get("demo-play");
+    assert.equal(play.attributes["aria-pressed"],String(!reduceMotion));
+    if (!reduceMotion) {
+      assert.equal(createdAnimations.length,5);
+      play.handlers.click();
+      assert.equal(play.attributes["aria-pressed"],"false");
+      show();
+      assert.equal(play.attributes["aria-pressed"],"false");
+      hide();show();
+      assert.equal(play.attributes["aria-pressed"],"true");
+    } else {
+      assert.equal(createdAnimations.length,0);
+      play.handlers.click();
+      assert.ok(elements.get("demo-position").textContent.includes("Bar 2"));
+    }
+    controller.destroy();
+    assert.equal(visibility.disconnected,true);
+    const count = createdAnimations.length;
+    show();
+    assert.equal(createdAnimations.length,count);
+  }
+});

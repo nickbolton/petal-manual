@@ -19,7 +19,7 @@ const PetalTimeline = (() => {
     return '<span class="petal-icon petal-icon-' + name + ' ' + extra + '" aria-hidden="true"></span>';
   }
   function markup() {
-    return '<figure class="petal-demo"><div class="petal-figure-heading"><span>A SONG IN MOTION</span><span>INTERACTIVE APP ILLUSTRATION</span></div><div class="petal-screen"><div class="petal-toolbar"><div class="petal-toolbar-left"><button id="demo-play" class="petal-control" aria-label="Play illustration" aria-pressed="false">' + icon("play") + '</button><button id="demo-stop" class="petal-control" aria-label="Stop and rewind illustration">' + icon("stop") + '</button></div><div class="petal-song-title"><strong>Midnight Drive <i aria-hidden="true"></i></strong><span>4/4 Time • 120 bpm</span></div><div class="petal-toolbar-balance" aria-hidden="true"></div></div><div class="petal-stage"><div id="demo-viewport" class="petal-viewport" tabindex="0" role="region" aria-label="Song timeline. Scroll horizontally or use left and right arrows to scrub."><div id="demo-world" class="petal-world"></div></div><div id="demo-ripples" class="petal-ripples" aria-hidden="true"></div><div class="petal-fixed-playhead" aria-hidden="true"></div></div><div class="petal-scrubber" role="group" aria-label="Jump to a song section">' + sections.map(s => '<button class="petal-mini-section" data-beat="' + s.start + '" aria-label="Jump to ' + s.name + '" style="--section-color:' + s.color + '"><span></span></button>').join("") + '<span id="demo-mini-head" class="petal-mini-playhead" aria-hidden="true"></span></div></div><figcaption class="petal-caption"><span>FIG. 01 &nbsp; The playhead stays still. Your song moves.</span><span id="demo-position">Intro · Bar 1 of 12</span></figcaption><p class="petal-demo-help">Press Play, drag the timeline, or tap a section in the overview. Section titles stick at the leading edge until the next section takes over. Illustration only; no MIDI or audio is sent.</p></figure>';
+    return '<figure class="petal-demo"><div class="petal-figure-heading"><span>A SONG IN MOTION</span><span>INTERACTIVE APP ILLUSTRATION</span></div><div class="petal-screen"><div class="petal-toolbar"><div class="petal-toolbar-left"><button id="demo-play" class="petal-control" aria-label="Play illustration" aria-pressed="false">' + icon("play") + '</button><button id="demo-stop" class="petal-control" aria-label="Stop and rewind illustration">' + icon("stop") + '</button></div><div class="petal-song-title"><strong>Midnight Drive <i aria-hidden="true"></i></strong><span>4/4 Time • 120 bpm</span></div><div class="petal-toolbar-balance" aria-hidden="true"></div></div><div class="petal-stage"><div id="demo-viewport" class="petal-viewport" tabindex="0" role="region" aria-label="Song timeline. Scroll horizontally or use left and right arrows to scrub."><div id="demo-world" class="petal-world"></div></div><div id="demo-ripples" class="petal-ripples" aria-hidden="true"></div><div class="petal-fixed-playhead" aria-hidden="true"></div></div><div class="petal-scrubber" role="group" aria-label="Jump to a song section">' + sections.map(s => '<button class="petal-mini-section" data-beat="' + s.start + '" aria-label="Jump to ' + s.name + '" style="--section-color:' + s.color + '"><span></span></button>').join("") + '<span id="demo-mini-head" class="petal-mini-playhead" aria-hidden="true"></span></div></div><figcaption class="petal-caption"><span>FIG. 01 &nbsp; The playhead stays still. Your song moves.</span><span id="demo-position">Intro · Bar 1 of 12</span></figcaption><p class="petal-demo-help">The illustration plays when it comes into view. Pause it, drag the timeline, or tap a section in the overview. Section titles stick at the leading edge until the next section takes over. Illustration only; no MIDI or audio is sent.</p></figure>';
   }
   function motionPlan(fromBeat, viewportWidth, labelWidths, scrubberWidth) {
     const start = position(fromBeat).scrollLeft;
@@ -217,8 +217,20 @@ const PetalTimeline = (() => {
       update();
       if (wasPlaying) start();
     });
+    let appeared = false;
+    const visibility = new IntersectionObserver(entries => {
+      if (destroyed) return;
+      const entry = entries[entries.length - 1];
+      const visible = entry.isIntersecting && entry.intersectionRatio >= .15;
+      if (visible === appeared) return;
+      appeared = visible;
+      if (reduced.matches) return;
+      if (visible) { if (!playing) start(); }
+      else pause();
+    }, {threshold:[0, .15]});
+    visibility.observe(viewport.closest(".petal-screen"));
     updateButton();
-    return {destroy() { destroyed = true; cancelMotion(); resize.disconnect(); }};
+    return {destroy() { destroyed = true; cancelMotion(); resize.disconnect(); visibility.disconnect(); }};
   }
   return {markup, attach, stickyOffset, position, motionPlan};
 })();

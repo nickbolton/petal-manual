@@ -58,3 +58,8 @@ The JavaScript frame loop only updates captions and reports occasional events;
 it does not perform geometry reads or write motion styles during playback.
 Motion stays linear and does not snap to beats. Only Play/Pause, Stop, and the section overview are presented as
 buttons; ornamental navigation and settings controls are omitted.
+
+The illustration starts when at least 15% of its app panel enters the viewport,
+pauses when it leaves, and resumes on re-entry. A new chapter illustration starts
+at the beginning. Manual pause is respected while it remains onscreen. Reduced
+Motion disables autoplay and retains manual bar-by-bar stepping.
