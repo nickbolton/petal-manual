@@ -1,0 +1,13 @@
+{
+  "name": "petal-user-manual",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A searchable, illustrated field guide to the Petal iOS app.",
+  "type": "module",
+  "engines": { "node": "24.x" },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/*.test.mjs",
+    "check": "node --check server.mjs && node --check dist/app.js && node --check dist/content.js"
+  }
+}
