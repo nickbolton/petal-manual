@@ -220,6 +220,12 @@ test("React Strict Mode remounts without duplicate timeline handlers; gestures a
     assert.equal(windows.document.querySelector<HTMLElement>(".petal-screen-frame")!.style.getPropertyValue("--petal-screen-scale"),"0.5");
     pointer(viewport,"pointerdown",300,90,100,{pointerType:"touch"});pointer(viewport,"pointermove",200,110,100,{pointerType:"touch"});
     assert.equal(windows.document.getElementById("demo-world")!.style.transform,"translate3d(-200px,0,0)");
+    // On touch devices, implicit capture belongs to the touched child. Moving
+    // capture to the viewport emits a bubbling loss on that child, not a release.
+    pointer(viewport.querySelector(".petal-event")!,"lostpointercapture",200,111,100,{pointerType:"touch"});
+    assert.equal(windows.document.body.classList.contains("petal-timeline-dragging"),true);
+    pointer(viewport,"pointermove",190,114,100,{pointerType:"touch"});
+    assert.equal(windows.document.getElementById("demo-world")!.style.transform,"translate3d(-220px,0,0)");
     pointer(viewport,"pointerdown",250,115,100,{pointerId:2,isPrimary:false,pointerType:"touch"});
     pointer(viewport,"pointerup",250,117,100,{pointerId:2,isPrimary:false,pointerType:"touch"});
     assert.equal(windows.document.body.classList.contains("petal-timeline-dragging"),true);
@@ -232,7 +238,14 @@ test("React Strict Mode remounts without duplicate timeline handlers; gestures a
     assert.match(windows.document.getElementById("demo-position")!.textContent!,/Verse · Bar 7/);
     const headAfter=Number.parseFloat(windows.document.getElementById("demo-mini-head")!.style.transform.slice(12));
     assert.ok(Math.abs((headAfter-headBefore)*.5-60)<1e-8);
-    pointer(mini,"pointercancel",160,160);
+    pointer(mini.querySelector("button span")!,"lostpointercapture",160,151,100,{pointerType:"touch"});
+    assert.equal(windows.document.body.classList.contains("petal-timeline-dragging"),true);
+    pointer(mini,"pointermove",180,155,100,{pointerType:"touch"});
+    const nextHead=Number.parseFloat(windows.document.getElementById("demo-mini-head")!.style.transform.slice(12));
+    assert.ok(Math.abs((nextHead-headBefore)*.5-80)<1e-8);
+    // Losing capture on the surface itself still terminates the gesture.
+    pointer(mini,"lostpointercapture",180,160,100,{pointerType:"touch"});
+    assert.equal(windows.document.body.classList.contains("petal-timeline-dragging"),false);
     windows.document.getElementById("demo-stop")!.click();
     screenFrameWidth=640;resizeCallback!();
     assert.equal(windows.document.querySelector<HTMLElement>(".petal-screen-frame")!.style.getPropertyValue("--petal-screen-scale"),"1");

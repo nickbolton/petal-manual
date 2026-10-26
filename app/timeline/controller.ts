@@ -390,7 +390,10 @@ export function attach(root: HTMLElement) {
   const preventSelection = (event: Event) => { if (pointer?.dragging || scrubPointer?.dragging) event.preventDefault(); };
   document.addEventListener("selectstart", preventSelection);
   listen(viewport, "dragstart", event => event.preventDefault());
-  listen(viewport, "lostpointercapture", endDrag);
+  // Touch starts with implicit capture on the hit-tested child. Transferring
+  // capture here makes that child emit a bubbling lostpointercapture event;
+  // only capture lost by the actual drag surface ends our gesture.
+  listen(viewport, "lostpointercapture", event => { if (event.target === viewport) endDrag(event); });
   listen(viewport, "pointerup", endDrag);
   listen(viewport, "pointercancel", endDrag);
   listen(viewport, "keydown", event => {
@@ -436,7 +439,7 @@ export function attach(root: HTMLElement) {
   };
   listen(scrubber, "pointerup", endScrub);
   listen(scrubber, "pointercancel", endScrub);
-  listen(scrubber, "lostpointercapture", endScrub);
+  listen(scrubber, "lostpointercapture", event => { if (event.target === scrubber) endScrub(event); });
   listen(scrubber, "dragstart", event => event.preventDefault());
   listen(scrubber, "click", event => {
     if ((suppressSectionClick || pageIsScrolling()) && event.detail !== 0) { event.preventDefault(); event.stopPropagation(); }
