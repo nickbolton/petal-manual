@@ -3,8 +3,7 @@
 An interactive field guide for the Petal iOS app, built with React, TypeScript,
 React Router framework mode, and Vite.
 
-**[Open the manual](https://petal-user-manual-b5af91119565.herokuapp.com/)** ·
-[Timeline demo](https://petal-user-manual-b5af91119565.herokuapp.com/timeline)
+**[Open the manual](https://petal-user-manual-b5af91119565.herokuapp.com/)**
 
 ## Demo
 
@@ -13,8 +12,6 @@ https://github.com/user-attachments/assets/0997eeb6-a4d0-480e-b3b5-ef053e2da991
 The live timeline illustration includes smooth playback, sticky section headers,
 event ripples, momentum dragging, rubber-banding, and a draggable song overview.
 It is an interactive illustration; it does not send MIDI or play audio.
-
-<!-- Add the recorded demo here when the video is ready. -->
 
 ## Requirements
 
