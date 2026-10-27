@@ -48,7 +48,7 @@ test("every chapter is pre-rendered, directly addressable, and has valid links",
 test("health, HEAD, assets, 404s, and source privacy",async()=>{
   assert.equal(await (await fetch(base+"/healthz")).text(),"ok");
   const head=await fetch(base+"/timeline",{method:"HEAD"});assert.equal(head.status,200);assert.equal(await head.text(),"");
-  for(const path of ["/icon.svg","/assets/play.png","/assets/pause.png","/assets/stop.png"]) assert.equal((await fetch(base+path)).status,200);
+  for(const path of ["/petal-mark.svg","/assets/play.png","/assets/pause.png","/assets/stop.png"]) assert.equal((await fetch(base+path)).status,200);
   for(const path of ["/missing","/server.mjs","/package.json","/app/content.ts","/.openai/hosting.json","/%2e%2e%2fserver.mjs","/__spa-fallback.html"]) assert.equal((await fetch(base+path)).status,404,path);
   assert.equal((await fetch(base+"/",{method:"POST"})).status,405);
 });
