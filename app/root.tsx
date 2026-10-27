@@ -6,7 +6,7 @@ import "./style.css";
 import "./timeline.css";
 
 export function Layout({ children }: {children: ReactNode}) {
-  return <html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#f7f6f2"/><Meta/><link rel="icon" href="/petal-mark.svg" type="image/svg+xml"/><Links/></head><body suppressHydrationWarning><script dangerouslySetInnerHTML={{__html:themeBootstrap}}/>{children}<ScrollRestoration/><Scripts/></body></html>;
+  return <html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#f7f6f2"/><Meta/><link rel="icon" href="/petal-mark.svg?v=3194fa" type="image/svg+xml"/><Links/></head><body suppressHydrationWarning><script dangerouslySetInnerHTML={{__html:themeBootstrap}}/>{children}<ScrollRestoration/><Scripts/></body></html>;
 }
 export default function App() { return <ThemeProvider><Outlet/></ThemeProvider>; }
 export function ErrorBoundary() {
